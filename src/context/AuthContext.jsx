@@ -54,7 +54,8 @@ export const AuthProvider = ({ children }) => {
     
     try {
       const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('email', '==', u.email));
+      // Normalize email search to lowercase
+      const q = query(usersRef, where('email', '==', u.email.trim().toLowerCase()));
       const querySnapshot = await getDocs(q);
       
       if (querySnapshot.empty) {
@@ -62,7 +63,7 @@ export const AuthProvider = ({ children }) => {
           // Create super admin profile if it doesn't exist
           const userProfile = {
             uid: u.uid,
-            email: u.email,
+            email: u.email.trim().toLowerCase(),
             fullName: u.displayName || 'Fabin Paul Francis',
             profilePhotoUrl: u.photoURL || '',
             role: 'super_admin',
@@ -78,7 +79,8 @@ export const AuthProvider = ({ children }) => {
         }
       } else {
         // Document with this email already exists (e.g. manually created by dojo head)
-        const existingDoc = querySnapshot.docs[0];
+        const migratedDoc = querySnapshot.docs.find(d => d.id === u.uid);
+        const existingDoc = migratedDoc || querySnapshot.docs[0];
         const existingData = existingDoc.data();
         
         // If the document ID is not the user's Google UID, migrate it to u.uid
@@ -86,11 +88,16 @@ export const AuthProvider = ({ children }) => {
           await setDoc(doc(db, 'users', u.uid), {
             ...existingData,
             uid: u.uid,
+            email: existingData.email ? existingData.email.trim().toLowerCase() : u.email.trim().toLowerCase(),
             profilePhotoUrl: existingData.profilePhotoUrl || u.photoURL || '',
             isOnboarded: existingData.isOnboarded !== undefined ? existingData.isOnboarded : true,
           });
           // Delete old random/temporary document
-          await deleteDoc(doc(db, 'users', existingDoc.id));
+          try {
+            await deleteDoc(doc(db, 'users', existingDoc.id));
+          } catch (delErr) {
+            console.warn("Could not delete temporary document during migration (will be auto-cleaned by admin dashboard):", delErr);
+          }
         } else {
           // If the profile already has UID, check if it needs to complete onboarding details
           if (!isAdminEmail && (existingData.isOnboarded === false || !existingData.mobileNumber)) {
@@ -154,24 +161,43 @@ export const AuthProvider = ({ children }) => {
               }
               setRole(data.role || 'student');
               setProfile(data);
+              setLoading(false);
             } else {
-              if (isAdminEmail) {
-                const userProfile = {
-                  uid: currentUser.uid,
-                  email: currentUser.email,
-                  fullName: currentUser.displayName || 'Fabin Paul Francis',
-                  role: 'super_admin',
-                  dojoId: 'pattam',
-                  isOnboarded: true,
-                  createdAt: serverTimestamp(),
-                };
-                await setDoc(docRef, userProfile);
-              } else {
+              // The user document does not exist under their UID yet.
+              // Check if a document matches their email under a temporary ID.
+              const usersRef = collection(db, 'users');
+              const q = query(usersRef, where('email', '==', currentUser.email.trim().toLowerCase()));
+              
+              getDocs(q).then((querySnapshot) => {
+                if (!querySnapshot.empty) {
+                  // A profile exists with this email but is under a temporary ID.
+                  // Migration is in progress! Keep loading = true, do not set loading = false yet.
+                  console.log("[AuthContext Trace] Temp profile found, migration in progress...");
+                } else {
+                  if (isAdminEmail) {
+                    const userProfile = {
+                      uid: currentUser.uid,
+                      email: currentUser.email.trim().toLowerCase(),
+                      fullName: currentUser.displayName || 'Fabin Paul Francis',
+                      role: 'super_admin',
+                      dojoId: 'pattam',
+                      isOnboarded: true,
+                      createdAt: serverTimestamp(),
+                    };
+                    setDoc(docRef, userProfile);
+                  } else {
+                    setRole('student');
+                    setProfile(null);
+                    setLoading(false);
+                  }
+                }
+              }).catch((err) => {
+                console.warn("Failed to check temporary email status:", err);
                 setRole('student');
                 setProfile(null);
-              }
+                setLoading(false);
+              });
             }
-            setLoading(false);
           }, (error) => {
             console.warn("Error listening to user profile:", error);
             setRole('student');

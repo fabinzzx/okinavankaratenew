@@ -149,11 +149,13 @@ const StudentDashboard = () => {
             </div>
             <div className="bg-brand-dark/5 dark:bg-brand-dark/50 border border-brand-dark/10 dark:border-white/5 px-6 py-3.5 rounded-2xl w-32 flex flex-col justify-center items-center">
               <p className={`text-xs font-black uppercase leading-none px-2.5 py-1 rounded-full ${
-                profile?.feesStatus?.toLowerCase() === 'paid'
-                  ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                  : 'bg-brand-red/10 text-brand-red border border-brand-red/20'
+                Number(profile?.pendingFees || 0) > 0
+                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                  : profile?.feesStatus?.toLowerCase() === 'paid'
+                    ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                    : 'bg-brand-red/10 text-brand-red border border-brand-red/20'
               }`}>
-                {profile?.feesStatus?.toUpperCase() || 'UNPAID'}
+                {Number(profile?.pendingFees || 0) > 0 ? `₹${profile.pendingFees} DUE` : (profile?.feesStatus?.toUpperCase() || 'UNPAID')}
               </p>
               <p className="text-[10px] text-gray-500 uppercase tracking-wider mt-2 font-bold">Fee Status</p>
             </div>
@@ -376,47 +378,107 @@ const StudentDashboard = () => {
             )}
 
             {/* 4. BELT EXAMS TAB */}
-            {activeTab === 'exams' && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-black uppercase text-brand-dark dark:text-white tracking-wide mb-2">Exam & Belt Rankings</h2>
-                  <div className="h-1 w-12 bg-brand-red mb-6" />
-                </div>
+            {activeTab === 'exams' && (() => {
+              const combinedExams = [];
+              
+              // Add from Firestore exams
+              exams.forEach(ex => {
+                combinedExams.push({
+                  date: ex.date || 'Recent',
+                  beltGrade: ex.beltGrade,
+                  examiner: ex.examiner || 'Dojo Instructor',
+                  score: ex.score || 'PASSED',
+                  result: ex.result || 'PASSED'
+                });
+              });
 
-                {exams.length > 0 ? (
-                  <div className="bg-brand-dark/5 dark:bg-brand-dark/50 border border-brand-dark/10 dark:border-white/5 rounded-2xl overflow-hidden">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-brand-dark/10 dark:bg-brand-dark border-b border-brand-dark/10 dark:border-white/10 text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider font-bold">
-                        <tr>
-                          <th className="p-4">Date</th>
-                          <th className="p-4">Target Belt Rank</th>
-                          <th className="p-4">Examiner</th>
-                          <th className="p-4">Score</th>
-                          <th className="p-4 text-right">Result</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-brand-dark/10 dark:divide-white/5 font-semibold text-xs sm:text-sm text-brand-dark dark:text-gray-300">
-                        {exams.map((exam, idx) => (
-                          <tr key={idx} className="hover:bg-brand-dark/5 dark:hover:bg-white/5">
-                            <td className="p-4">{exam.date}</td>
-                            <td className="p-4 text-brand-dark dark:text-white font-extrabold">{exam.beltGrade}</td>
-                            <td className="p-4">{exam.examiner}</td>
-                            <td className="p-4 text-brand-gold">{exam.score}</td>
-                            <td className="p-4 text-right text-emerald-500 font-bold">{exam.result}</td>
-                          </tr>
+              // Add from profile.beltHistory if not already present by beltGrade
+              if (profile?.beltHistory) {
+                profile.beltHistory.forEach(bh => {
+                  const exists = combinedExams.some(ex => ex.beltGrade?.toLowerCase() === bh.belt?.toLowerCase());
+                  if (!exists) {
+                    combinedExams.push({
+                      date: bh.date || 'Recent',
+                      beltGrade: bh.belt,
+                      examiner: bh.updatedBy || 'Dojo Instructor',
+                      score: 'Promoted',
+                      result: 'PASSED'
+                    });
+                  }
+                });
+              }
+
+              // Sort descending by date
+              combinedExams.sort((a, b) => {
+                const dateA = new Date(a.date).getTime() || 0;
+                const dateB = new Date(b.date).getTime() || 0;
+                return dateB - dateA;
+              });
+
+              return (
+                <div className="space-y-8">
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-black uppercase text-brand-dark dark:text-white tracking-wide mb-2">Exam & Belt Rankings</h2>
+                    <div className="h-1 w-12 bg-brand-red mb-6" />
+                  </div>
+
+                  {/* Timeline for Belt Promotions */}
+                  {profile?.beltHistory && profile.beltHistory.length > 0 && (
+                    <div className="bg-brand-dark/5 dark:bg-brand-dark/50 border border-brand-dark/10 dark:border-white/5 p-6 rounded-3xl space-y-4">
+                      <h3 className="text-sm font-extrabold uppercase text-gray-500 dark:text-gray-300 tracking-wider">Promotion History Timeline</h3>
+                      <div className="relative pl-6 border-l border-brand-gold/30 space-y-6">
+                        {profile.beltHistory.slice().reverse().map((bh, idx) => (
+                          <div key={idx} className="relative">
+                            <span className="absolute -left-[30px] top-1.5 h-3.5 w-3.5 rounded-full border-2 border-brand-gold bg-white dark:bg-brand-dark" />
+                            <div>
+                              <p className="text-sm font-black text-brand-dark dark:text-white uppercase tracking-wide">{bh.belt}</p>
+                              <p className="text-[10px] text-gray-500 mt-0.5">Awarded on: <strong>{bh.date}</strong> by {bh.updatedBy || 'Dojo Instructor'}</p>
+                            </div>
+                          </div>
                         ))}
-                      </tbody>
-                    </table>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <h3 className="text-sm font-extrabold uppercase text-gray-500 dark:text-gray-300 tracking-wider mb-3">Grading Records</h3>
                   </div>
-                ) : (
-                  <div className="p-12 text-center border border-dashed border-brand-dark/10 dark:border-white/10 rounded-3xl text-gray-500 dark:text-gray-400 text-sm">
-                    <MedalIcon size={36} className="mx-auto mb-3 opacity-40 text-brand-gold" />
-                    <p className="font-bold uppercase tracking-wider mb-1">No Kyu Grading History</p>
-                    <p className="text-xs">Grade promotional exams must be conducted and registered by an authorized Dojo Admin.</p>
-                  </div>
-                )}
-              </div>
-            )}
+
+                  {combinedExams.length > 0 ? (
+                    <div className="bg-brand-dark/5 dark:bg-brand-dark/50 border border-brand-dark/10 dark:border-white/5 rounded-2xl overflow-hidden">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-brand-dark/10 dark:bg-brand-dark border-b border-brand-dark/10 dark:border-white/10 text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider font-bold">
+                          <tr>
+                            <th className="p-4">Date</th>
+                            <th className="p-4">Target Belt Rank</th>
+                            <th className="p-4">Examiner</th>
+                            <th className="p-4">Score</th>
+                            <th className="p-4 text-right">Result</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-brand-dark/10 dark:divide-white/5 font-semibold text-xs sm:text-sm text-brand-dark dark:text-gray-300">
+                          {combinedExams.map((exam, idx) => (
+                            <tr key={idx} className="hover:bg-brand-dark/5 dark:hover:bg-white/5">
+                              <td className="p-4">{exam.date}</td>
+                              <td className="p-4 text-brand-dark dark:text-white font-extrabold">{exam.beltGrade}</td>
+                              <td className="p-4">{exam.examiner}</td>
+                              <td className="p-4 text-brand-gold">{exam.score}</td>
+                              <td className="p-4 text-right text-emerald-500 font-bold">{exam.result}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="p-12 text-center border border-dashed border-brand-dark/10 dark:border-white/10 rounded-3xl text-gray-500 dark:text-gray-400 text-sm">
+                      <MedalIcon size={36} className="mx-auto mb-3 opacity-40 text-brand-gold" />
+                      <p className="font-bold uppercase tracking-wider mb-1">No Kyu Grading History</p>
+                      <p className="text-xs">Grade promotional exams must be conducted and registered by an authorized Dojo Admin.</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* 5. TOURNAMENTS TAB */}
             {activeTab === 'tournaments' && (
@@ -463,8 +525,63 @@ const StudentDashboard = () => {
             {activeTab === 'fees' && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-xl sm:text-2xl font-black uppercase text-brand-dark dark:text-white tracking-wide mb-2">Monthly Fee Logs</h2>
+                  <h2 className="text-xl sm:text-2xl font-black uppercase text-brand-dark dark:text-white tracking-wide mb-2">My Dues & Fees</h2>
                   <div className="h-1 w-12 bg-brand-red mb-6" />
+                </div>
+
+                {/* Balance Dues Notice Card */}
+                <div className={`p-6 rounded-2xl border ${
+                  Number(profile?.pendingFees || 0) > 0
+                    ? 'bg-amber-500/10 border-amber-500/20 text-brand-dark dark:text-white'
+                    : 'bg-emerald-500/10 border-emerald-500/20 text-brand-dark dark:text-white'
+                }`}>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-widest text-gray-500 dark:text-gray-400 font-extrabold">Outstanding Balance</p>
+                      <p className="text-3xl font-black mt-1">₹{profile?.pendingFees || '0'}</p>
+                    </div>
+                    {Number(profile?.pendingFees || 0) > 0 ? (
+                      <div className="bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/35 px-4 py-2.5 rounded-xl text-xs font-semibold leading-relaxed">
+                        ⚠️ Please clear your dues of <strong>₹{profile.pendingFees}</strong> with your Dojo Branch instructor.
+                      </div>
+                    ) : (
+                      <div className="bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/35 px-4 py-2.5 rounded-xl text-xs font-semibold leading-relaxed">
+                        ✓ All dues are fully settled! Thank you.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {Number(profile?.pendingFees || 0) > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-extrabold uppercase text-amber-500 tracking-wider">Pending Dues</h3>
+                    <div className="bg-brand-dark/5 dark:bg-brand-dark/50 border border-amber-500/20 rounded-2xl overflow-hidden">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-amber-500/10 border-b border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs uppercase tracking-wider font-bold">
+                          <tr>
+                            <th className="p-4">Dues Description</th>
+                            <th className="p-4">Amount Outstanding</th>
+                            <th className="p-4 text-right">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="font-semibold text-xs sm:text-sm text-brand-dark dark:text-gray-300">
+                          <tr className="bg-amber-500/5">
+                            <td className="p-4 text-brand-dark dark:text-white font-extrabold">Outstanding Academy Fee Dues</td>
+                            <td className="p-4 text-amber-600 dark:text-amber-400 font-bold">₹{profile.pendingFees}</td>
+                            <td className="p-4 text-right">
+                              <span className="px-3 py-1 bg-amber-500/15 border border-amber-500/25 text-amber-600 dark:text-amber-400 rounded-full text-xs font-bold uppercase">
+                                PENDING
+                              </span>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <h3 className="text-sm font-extrabold uppercase text-gray-500 dark:text-gray-300 tracking-wider mb-3">Settled Monthly Payments</h3>
                 </div>
 
                 {fees.length > 0 ? (
@@ -473,7 +590,7 @@ const StudentDashboard = () => {
                       <thead className="bg-brand-dark/10 dark:bg-brand-dark border-b border-brand-dark/10 dark:border-white/10 text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider font-bold">
                         <tr>
                           <th className="p-4">Month Period</th>
-                          <th className="p-4">Amount Due</th>
+                          <th className="p-4">Amount Cleared</th>
                           <th className="p-4">Payment Date</th>
                           <th className="p-4 text-right">Status</th>
                         </tr>

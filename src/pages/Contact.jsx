@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Send, Phone, Mail, MapPin, MessageSquare, Trophy } from 'lucide-react';
 import { DOJO_LIST } from '../data/dojos';
+import { db } from '../firebase/config';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -12,13 +14,33 @@ const Contact = () => {
     message: ''
   });
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Simulate submission
-    console.log("Contact form submitted:", formData);
-    setSubmitted(true);
-    setFormData({ name: '', email: '', phone: '', dojo: '', message: '' });
+    setLoading(true);
+    try {
+      const selectedDojo = DOJO_LIST.find(d => d.name === formData.dojo);
+      const dojoId = selectedDojo ? selectedDojo.id : 'unknown';
+
+      await addDoc(collection(db, 'enquiries'), {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        dojoName: formData.dojo,
+        dojoId: dojoId,
+        message: formData.message,
+        createdAt: serverTimestamp()
+      });
+
+      setSubmitted(true);
+      setFormData({ name: '', email: '', phone: '', dojo: '', message: '' });
+    } catch (err) {
+      console.error("Enquiry submission failed:", err);
+      alert("Failed to send message. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -192,10 +214,17 @@ const Contact = () => {
 
                   <button
                     type="submit"
-                    className="w-full sm:w-auto px-8 py-3.5 bg-brand-red hover:bg-red-700 text-white font-bold text-sm tracking-wider uppercase rounded-xl transition-all shadow-md flex items-center justify-center space-x-2 cursor-pointer"
+                    disabled={loading}
+                    className="w-full sm:w-auto px-8 py-3.5 bg-brand-red hover:bg-red-700 disabled:bg-gray-700 text-white font-bold text-sm tracking-wider uppercase rounded-xl transition-all shadow-md flex items-center justify-center space-x-2 cursor-pointer"
                   >
-                    <Send size={16} />
-                    <span>Send Message</span>
+                    {loading ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white" />
+                    ) : (
+                      <>
+                        <Send size={16} />
+                        <span>Send Message</span>
+                      </>
+                    )}
                   </button>
                 </form>
               )}

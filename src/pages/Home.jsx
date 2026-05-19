@@ -87,17 +87,17 @@ const Home = () => {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link 
-                to="/joinus" 
+                to="/dojos" 
                 className="w-full sm:w-auto px-8 py-4 bg-brand-red hover:bg-red-700 text-white font-extrabold text-sm uppercase tracking-widest rounded-full transition-all shadow-xl hover:shadow-brand-red/35 flex items-center justify-center space-x-2"
               >
-                <span>Start Training Today</span>
+                <span>Find a Dojo Near You</span>
                 <ChevronRight size={16} />
               </Link>
               <Link 
-                to="/dojos" 
+                to="/contact" 
                 className="w-full sm:w-auto px-8 py-4 border border-white/20 hover:border-brand-red hover:bg-white/5 text-white font-bold text-sm uppercase tracking-widest rounded-full transition-all flex items-center justify-center"
               >
-                Find a Dojo Near You
+                Contact Academy
               </Link>
             </div>
           </motion.div>

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, BarChart2, Calendar, Award, CreditCard, Bell, UserCog, Home,
-  Settings, Search, Plus, Edit2, Trash2, Shield, Eye, Download, FileText
+  Settings, Search, Plus, Edit2, Trash2, Shield, Eye, Download, FileText, MessageSquare, Mail
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell 
@@ -14,6 +14,28 @@ import { getAuth, createUserWithEmailAndPassword, signOut as firebaseSignOut, se
 import { initializeApp, deleteApp } from 'firebase/app';
 import { db, auth, firebaseConfig } from '../firebase/config';
 import { DOJO_LIST } from '../data/dojos';
+
+const BELT_GRADES = [
+  "White Belt",
+  "Yellow Belt",
+  "Orange Belt",
+  "Green Belt",
+  "Blue Belt",
+  "Purple Belt",
+  "Brown Junior",
+  "Brown Senior",
+  "Brown Super Senior",
+  "Black Belt (1st Dan)",
+  "Black Belt (2nd Dan)",
+  "Black Belt (3rd Dan)",
+  "Black Belt (4th Dan)",
+  "Black Belt (5th Dan)",
+  "Black Belt (6th Dan)",
+  "Black Belt (7th Dan)",
+  "Black Belt (8th Dan)",
+  "Black Belt (9th Dan)",
+  "Black Belt (10th Dan)"
+];
 
 const AdminDashboard = () => {
   const { user, profile, role } = useAuth();
@@ -41,7 +63,8 @@ const AdminDashboard = () => {
     mobileNumber: '',
     dojoId: '',
     beltGrade: 'White Belt',
-    role: 'student'
+    role: 'student',
+    pendingFees: '0'
   });
 
   // Admin creation modal (super_admin only)
@@ -53,6 +76,11 @@ const AdminDashboard = () => {
   const [editingStudent, setEditingStudent] = useState(null);
   const [editForm, setEditForm] = useState({});
 
+  // Edit admin modal states (super_admin only)
+  const [editingAdmin, setEditingAdmin] = useState(null);
+  const [editAdminForm, setEditAdminForm] = useState({ fullName: '', dojoIds: [] });
+  const [adminSaving, setAdminSaving] = useState(false);
+
   const [notificationForm, setNotificationForm] = useState({
     title: '',
     message: '',
@@ -61,6 +89,60 @@ const AdminDashboard = () => {
 
   const [activityLogs, setActivityLogs] = useState([]);
 
+  // Enquiries states
+  const [enquiries, setEnquiries] = useState([]);
+  const [loadingEnquiries, setLoadingEnquiries] = useState(false);
+
+  // Load enquiries
+  useEffect(() => {
+    if (activeView === 'enquiries') {
+      const fetchEnquiries = async () => {
+        setLoadingEnquiries(true);
+        try {
+          const querySnapshot = await getDocs(collection(db, 'enquiries'));
+          const list = querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            let formattedDate = 'Recent';
+            if (data.createdAt?.seconds) {
+              formattedDate = new Date(data.createdAt.seconds * 1000).toLocaleDateString('en-IN', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              });
+            }
+            return {
+              id: doc.id,
+              ...data,
+              formattedDate
+            };
+          });
+
+          // Sort descending
+          const sorted = list.sort((a, b) => {
+            const timeA = a.createdAt?.seconds || 0;
+            const timeB = b.createdAt?.seconds || 0;
+            return timeB - timeA;
+          });
+
+          if (role === 'super_admin') {
+            setEnquiries(sorted);
+          } else {
+            const dojosToFilter = profile?.dojoIds?.length > 0 ? profile.dojoIds : [profile?.dojoId || 'pattam'];
+            const filtered = sorted.filter(enq => dojosToFilter.includes(enq.dojoId));
+            setEnquiries(filtered);
+          }
+        } catch (error) {
+          console.error("Error loading enquiries", error);
+        } finally {
+          setLoadingEnquiries(false);
+        }
+      };
+      fetchEnquiries();
+    }
+  }, [activeView, role, profile]);
+
   // Load students from Firestore
   useEffect(() => {
     const fetchStudents = async () => {
@@ -68,14 +150,55 @@ const AdminDashboard = () => {
         const querySnapshot = await getDocs(collection(db, 'users'));
         const list = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
+        // Find duplicates by email and clean them up
+        const emailMap = {};
+        const duplicatesToDelete = [];
+        
+        list.forEach(item => {
+          if (!item.email) return;
+          const email = item.email.trim().toLowerCase();
+          if (!emailMap[email]) {
+            emailMap[email] = [];
+          }
+          emailMap[email].push(item);
+        });
+
+        const cleanedList = [];
+        for (const email in emailMap) {
+          const docs = emailMap[email];
+          if (docs.length > 1) {
+            // Sort so the official logged-in document (which has standard 28-char UID) is first
+            docs.sort((a, b) => b.id.length - a.id.length);
+            cleanedList.push(docs[0]);
+            
+            // Collect the others (temporary random documents) for deletion
+            for (let i = 1; i < docs.length; i++) {
+              duplicatesToDelete.push(docs[i].id);
+            }
+          } else {
+            cleanedList.push(docs[0]);
+          }
+        }
+
+        // Fire off background deletions for duplicates (admins have full write/delete permissions)
+        duplicatesToDelete.forEach(async (tempId) => {
+          try {
+            await deleteDoc(doc(db, 'users', tempId));
+            console.log(`[Autoclean] Deleted duplicate student document: ${tempId}`);
+          } catch (err) {
+            console.warn(`[Autoclean] Failed to delete duplicate student document ${tempId}:`, err);
+          }
+        });
+
         // Access control filter
         if (role === 'dojo_admin') {
-          // Dojo Admin can only see students in their dojo
-          const filtered = list.filter(student => student.dojoId === profile?.dojoId);
+          // Dojo Admin can only see students in their assigned dojos
+          const dojosToFilter = profile?.dojoIds?.length > 0 ? profile.dojoIds : [profile?.dojoId || 'pattam'];
+          const filtered = cleanedList.filter(student => dojosToFilter.includes(student.dojoId) || student.role === 'dojo_admin');
           setStudents(filtered);
         } else {
           // Super Admin can see everyone
-          setStudents(list);
+          setStudents(cleanedList);
         }
       } catch (error) {
         console.error("Error loading students", error);
@@ -186,7 +309,14 @@ const AdminDashboard = () => {
     ? `₹${(totalMonthlyIncome / 100000).toFixed(2)}L` 
     : `₹${totalMonthlyIncome.toLocaleString('en-IN')}`;
 
-  const displayStudents = students.filter(s => s.role === 'student');
+  const displayStudents = students.filter(s => {
+    if (s.role !== 'student') return false;
+    if (role === 'super_admin') return true;
+    if (profile?.dojoIds && profile.dojoIds.length > 0) {
+      return profile.dojoIds.includes(s.dojoId);
+    }
+    return s.dojoId === (profile?.dojoId || 'pattam');
+  });
 
   // Perform client side search & filter
   const filteredStudents = displayStudents.filter(student => {
@@ -205,10 +335,20 @@ const AdminDashboard = () => {
       return;
     }
     setAdminCreating(true);
+    const normalizedEmail = adminForm.email.trim().toLowerCase();
     try {
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('email', '==', normalizedEmail));
+      const querySnapshot = await getDocs(q);
+      if (!querySnapshot.empty) {
+        alert(`An account with the email ${normalizedEmail} is already registered.`);
+        setAdminCreating(false);
+        return;
+      }
+
       const secondaryApp = initializeApp(firebaseConfig, `admin-create-${Date.now()}`);
       const secondaryAuth = getAuth(secondaryApp);
-      const credential = await createUserWithEmailAndPassword(secondaryAuth, adminForm.email, 'test12');
+      const credential = await createUserWithEmailAndPassword(secondaryAuth, normalizedEmail, 'test12');
       const newUid = credential.user.uid;
       await firebaseSignOut(secondaryAuth);
       await deleteApp(secondaryApp);
@@ -218,7 +358,7 @@ const AdminDashboard = () => {
       const adminData = {
         uid: newUid,
         fullName: adminForm.fullName,
-        email: adminForm.email,
+        email: normalizedEmail,
         role: 'dojo_admin',
         dojoId: primaryDojoId,
         dojoIds: adminForm.dojoIds,
@@ -226,7 +366,7 @@ const AdminDashboard = () => {
         createdAt: serverTimestamp(),
       };
       await setDoc(doc(db, 'users', newUid), adminData);
-      await sendPasswordResetEmail(auth, adminForm.email);
+      await sendPasswordResetEmail(auth, normalizedEmail);
 
       setStudents(prev => [...prev, { ...adminData, id: newUid }]);
       setActivityLogs(prev => [
@@ -236,7 +376,7 @@ const AdminDashboard = () => {
       setIsAdminModalOpen(false);
       setAdminForm({ fullName: '', email: '', dojoIds: [] });
       const dojoNames = adminForm.dojoIds.map(id => DOJO_LIST.find(d => d.id === id)?.name || id).join(', ');
-      alert(`Admin account created!\n\nName: ${adminForm.fullName}\nEmail: ${adminForm.email}\nDojos: ${dojoNames}\nDefault Password: test12\n\nA password reset email has been sent.`);
+      alert(`Admin account created!\n\nName: ${adminForm.fullName}\nEmail: ${normalizedEmail}\nDojos: ${dojoNames}\nDefault Password: test12\n\nA password reset email has been sent.`);
     } catch (error) {
       console.error(error);
       if (error.code === 'auth/email-already-in-use') {
@@ -251,20 +391,32 @@ const AdminDashboard = () => {
 
   const handleCreateStudent = async (e) => {
     e.preventDefault();
+    const normalizedEmail = studentForm.email.trim().toLowerCase();
     try {
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('email', '==', normalizedEmail));
+      const querySnapshot = await getDocs(q);
+      if (!querySnapshot.empty) {
+        alert(`An account with the email ${normalizedEmail} is already registered.`);
+        return;
+      }
+
       const newStudentRef = doc(collection(db, 'users'));
       const targetRole = role === 'super_admin' ? studentForm.role : 'student';
       const targetDojoId = role === 'super_admin' ? studentForm.dojoId : (profile?.dojoId || 'pattam');
       
       const studentData = {
+        id: newStudentRef.id,
         uid: newStudentRef.id,
         fullName: studentForm.fullName,
-        email: studentForm.email,
+        email: normalizedEmail,
         mobileNumber: studentForm.mobileNumber,
         dojoId: targetDojoId,
         beltGrade: targetRole === 'dojo_admin' ? '' : studentForm.beltGrade,
         role: targetRole,
         isOnboarded: true,
+        pendingFees: studentForm.pendingFees || '0',
+        feesStatus: Number(studentForm.pendingFees || 0) > 0 ? 'pending' : 'paid',
         createdAt: serverTimestamp(),
       };
       await setDoc(newStudentRef, studentData);
@@ -274,7 +426,7 @@ const AdminDashboard = () => {
         { timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `${targetRole === 'dojo_admin' ? 'Dojo Admin' : 'Student'} profile created for ${studentForm.fullName}`, user: role === 'super_admin' ? 'Super Admin' : 'Dojo Admin' },
         ...prev
       ]);
-      setStudentForm({ fullName: '', email: '', mobileNumber: '', dojoId: '', beltGrade: 'White Belt', role: 'student' });
+      setStudentForm({ fullName: '', email: '', mobileNumber: '', dojoId: '', beltGrade: 'White Belt', role: 'student', pendingFees: '0' });
       alert(`${targetRole === 'dojo_admin' ? 'Admin' : 'Student'} profile created successfully!`);
     } catch (error) {
       console.error(error);
@@ -284,7 +436,7 @@ const AdminDashboard = () => {
 
   const handleDeleteStudent = async (id) => {
     if (id === user?.uid) {
-      alert("You cannot delete your own admin profile.");
+      alert("You cannot delete your own profile.");
       return;
     }
     if (!window.confirm("Are you sure you want to delete this profile?")) return;
@@ -312,24 +464,74 @@ const AdminDashboard = () => {
       feesStatus: student.feesStatus || 'unpaid',
       address: student.address || '',
       emergencyContact: student.emergencyContact || '',
+      pendingFees: student.pendingFees || '0',
     });
   };
 
   const handleEditStudent = async (e) => {
     e.preventDefault();
     if (!editingStudent) return;
+    const studentId = editingStudent.id || editingStudent.uid;
+    if (!studentId) {
+      alert("Failed to update profile: student ID is missing.");
+      return;
+    }
+
     try {
-      const studentRef = doc(db, 'users', editingStudent.id);
-      await updateDoc(studentRef, {
+      const studentRef = doc(db, 'users', studentId);
+      
+      const updateData = {
         fullName: editForm.fullName,
         mobileNumber: editForm.mobileNumber,
         dojoId: editForm.dojoId,
         beltGrade: editForm.beltGrade,
-        feesStatus: editForm.feesStatus,
         address: editForm.address,
         emergencyContact: editForm.emergencyContact,
-      });
-      setStudents(prev => prev.map(s => s.id === editingStudent.id ? { ...s, ...editForm } : s));
+        pendingFees: editForm.pendingFees || '0',
+        feesStatus: Number(editForm.pendingFees || 0) > 0 ? 'pending' : 'paid'
+      };
+
+      // Automatic belt history logging if changed
+      if (editForm.beltGrade !== editingStudent.beltGrade) {
+        const newBeltEntry = {
+          belt: editForm.beltGrade,
+          date: new Date().toISOString().split('T')[0],
+          updatedBy: profile?.fullName || 'Dojo Instructor'
+        };
+        const updatedBeltHistory = [...(editingStudent.beltHistory || []), newBeltEntry];
+        updateData.beltHistory = updatedBeltHistory;
+
+        // Write to exams collection
+        const examRef = doc(collection(db, 'exams'));
+        await setDoc(examRef, {
+          uid: studentId,
+          beltGrade: editForm.beltGrade,
+          date: new Date().toISOString().split('T')[0],
+          examiner: profile?.fullName || 'Dojo Instructor',
+          score: 'Promoted',
+          result: 'PASSED',
+          createdAt: serverTimestamp()
+        });
+      }
+
+      // Automatic fee collection logging (when cleared/paid)
+      if (Number(editForm.pendingFees) === 0 && Number(editingStudent.pendingFees || 0) > 0) {
+        const feeRef = doc(collection(db, 'fees'));
+        await setDoc(feeRef, {
+          uid: studentId,
+          amount: `₹${editingStudent.pendingFees}`,
+          date: new Date().toISOString().split('T')[0],
+          month: new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' }),
+          status: 'PAID',
+          createdAt: serverTimestamp()
+        });
+      }
+
+      await updateDoc(studentRef, updateData);
+      
+      // Update local state
+      setStudents(prev => prev.map(s => (s.id === studentId || s.uid === studentId) ? { ...s, ...updateData, beltHistory: updateData.beltHistory || s.beltHistory } : s));
+      
       setActivityLogs(prev => [
         { timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `Updated profile: ${editForm.fullName}`, user: role === 'super_admin' ? 'Super Admin' : 'Dojo Admin' },
         ...prev
@@ -339,6 +541,67 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error(error);
       alert('Failed to update profile.');
+    }
+  };
+
+  const handleOpenEditAdmin = (admin) => {
+    setEditingAdmin(admin);
+    setEditAdminForm({
+      fullName: admin.fullName || '',
+      dojoIds: admin.dojoIds || (admin.dojoId ? [admin.dojoId] : []),
+    });
+  };
+
+  const handleSaveAdmin = async (e) => {
+    e.preventDefault();
+    if (!editingAdmin) return;
+    if (editAdminForm.dojoIds.length === 0) {
+      alert('Please select at least one dojo branch.');
+      return;
+    }
+    setAdminSaving(true);
+    try {
+      const adminRef = doc(db, 'users', editingAdmin.id || editingAdmin.uid);
+      const primaryDojoId = editAdminForm.dojoIds[0];
+      const adminData = {
+        fullName: editAdminForm.fullName,
+        dojoId: primaryDojoId,
+        dojoIds: editAdminForm.dojoIds,
+      };
+      await updateDoc(adminRef, adminData);
+      
+      setStudents(prev => prev.map(s => (s.id === editingAdmin.id || s.uid === editingAdmin.uid) ? { ...s, ...adminData } : s));
+      setActivityLogs(prev => [
+        { timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `Dojo Admin updated: ${editAdminForm.fullName}`, user: 'Super Admin' },
+        ...prev
+      ]);
+      setEditingAdmin(null);
+      alert('Dojo Admin profile updated successfully!');
+    } catch (e) {
+      console.error(e);
+      alert('Failed to update admin profile.');
+    } finally {
+      setAdminSaving(false);
+    }
+  };
+
+  const handleDeleteAdmin = async (id) => {
+    if (id === user?.uid) {
+      alert("You cannot delete your own admin account.");
+      return;
+    }
+    if (!window.confirm("Are you sure you want to delete this Dojo Admin account? This will revoke their access.")) return;
+    try {
+      await deleteDoc(doc(db, 'users', id));
+      setStudents(students.filter(s => s.id !== id));
+      setActivityLogs(prev => [
+        { timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `Admin deleted: ${id}`, user: 'Super Admin' },
+        ...prev
+      ]);
+      alert("Dojo Admin account deleted successfully from the roster.");
+    } catch (e) {
+      console.error(e);
+      alert("Failed to delete Admin profile.");
     }
   };
 
@@ -425,8 +688,10 @@ const AdminDashboard = () => {
             {[
               { id: 'overview', label: 'Analytics', icon: <BarChart2 size={16} /> },
               { id: 'students', label: 'Students', icon: <Users size={16} /> },
+              ...(role === 'super_admin' ? [{ id: 'admins', label: 'Admins', icon: <UserCog size={16} /> }] : []),
               { id: 'attendance', label: 'Attendance', icon: <Calendar size={16} /> },
               { id: 'notifications', label: 'Dojo Broadcast', icon: <Bell size={16} /> },
+              { id: 'enquiries', label: 'Enquiries', icon: <MessageSquare size={16} /> },
               { id: 'logs', label: 'Activity Logs', icon: <FileText size={16} /> }
             ].map((item) => (
               <button
@@ -564,15 +829,6 @@ const AdminDashboard = () => {
               </div>
 
               <div className="flex items-center space-x-3">
-                {role === 'super_admin' && (
-                  <button
-                    onClick={() => setIsAdminModalOpen(true)}
-                    className="px-5 py-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs uppercase tracking-widest rounded-xl transition-all shadow-md flex items-center justify-center space-x-1.5"
-                  >
-                    <UserCog size={14} />
-                    <span>Add Admin</span>
-                  </button>
-                )}
                 <button
                   onClick={() => setIsStudentModalOpen(true)}
                   className="px-6 py-3 bg-brand-red hover:bg-red-700 text-white font-bold text-xs uppercase tracking-widest rounded-xl transition-all shadow-md flex items-center justify-center space-x-1.5"
@@ -603,17 +859,36 @@ const AdminDashboard = () => {
                   className="bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-brand-red/50 text-gray-300 w-full md:w-auto"
                 >
                   <option value="">All branches</option>
-                  <option value="sunil_hall">Sunil Hall</option>
-                  <option value="puliyamthuruthu">Puliyamthuruthu Dojo</option>
-                  <option value="pothanicad">Pothanicad Dojo</option>
-                  <option value="panayikulam">Bhavas Building</option>
-                  <option value="pattam">Pattam Dojo</option>
+                  {DOJO_LIST.map(dojo => (
+                    <option key={dojo.id} value={dojo.id}>{dojo.name}</option>
+                  ))}
                 </select>
-              ) : (
-                <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-gray-300">
-                  Branch: <span className="font-extrabold uppercase">{branches.find(b => b.id === profile?.dojoId)?.name || profile?.dojoId || 'Pattam Dojo'}</span>
-                </div>
-              )}
+              ) : (() => {
+                const adminDojos = profile?.dojoIds?.length > 0
+                  ? DOJO_LIST.filter(d => profile.dojoIds.includes(d.id))
+                  : DOJO_LIST.filter(d => d.id === (profile?.dojoId || 'pattam'));
+                
+                if (adminDojos.length <= 1) {
+                  return (
+                    <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-gray-300">
+                      Branch: <span className="font-extrabold uppercase">{adminDojos[0]?.name || 'Pattam Dojo'}</span>
+                    </div>
+                  );
+                }
+
+                return (
+                  <select
+                    value={selectedDojoFilter}
+                    onChange={(e) => setSelectedDojoFilter(e.target.value)}
+                    className="bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-brand-red/50 text-gray-300 w-full md:w-auto"
+                  >
+                    <option value="">All My Branches</option>
+                    {adminDojos.map(dojo => (
+                      <option key={dojo.id} value={dojo.id}>{dojo.name}</option>
+                    ))}
+                  </select>
+                );
+              })()}
             </div>
 
             {/* Students Directory Grid/Table */}
@@ -675,6 +950,124 @@ const AdminDashboard = () => {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* 2.2. ADMINS VIEW (super_admin only) */}
+        {activeView === 'admins' && role === 'super_admin' && (
+          <div className="space-y-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-black uppercase text-white tracking-wide">
+                  Dojo <span className="text-brand-gold">Admins</span>
+                </h1>
+                <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider font-semibold">
+                  Manage accounts and branch assignments for instructors
+                </p>
+              </div>
+
+              <div>
+                <button
+                  onClick={() => setIsAdminModalOpen(true)}
+                  className="px-6 py-3 bg-brand-gold hover:bg-yellow-600 text-brand-dark font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-md flex items-center justify-center space-x-1.5"
+                >
+                  <UserCog size={14} />
+                  <span>Create Admin Account</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Filters / Search Bar */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-center justify-between shadow-lg">
+              <div className="relative w-full md:w-80">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
+                <input
+                  type="text"
+                  placeholder="Search admin name or email..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-brand-dark/50 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs focus:outline-none focus:border-brand-gold/50 text-white placeholder-gray-500"
+                />
+              </div>
+            </div>
+
+            {/* Admins Table */}
+            <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[700px]">
+                  <thead>
+                    <tr className="bg-white/5 border-b border-white/10 text-gray-400 text-[10px] uppercase tracking-widest font-extrabold">
+                      <th className="p-4">Admin Profile</th>
+                      <th className="p-4">Assigned Dojos</th>
+                      <th className="p-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 font-semibold text-xs sm:text-sm text-gray-300">
+                    {students
+                      .filter(s => s.role === 'dojo_admin')
+                      .filter(s => {
+                        const q = searchQuery.toLowerCase();
+                        return (s.fullName || '').toLowerCase().includes(q) || (s.email || '').toLowerCase().includes(q);
+                      })
+                      .map((admin) => (
+                        <tr key={admin.id || admin.uid} className="hover:bg-white/5">
+                          <td className="p-4">
+                            <div>
+                              <p className="text-white font-extrabold text-sm">{admin.fullName}</p>
+                              <p className="text-[10px] text-gray-500 font-semibold">{admin.email}</p>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex flex-wrap gap-1.5">
+                              {admin.dojoIds && admin.dojoIds.length > 0 ? (
+                                admin.dojoIds.map(id => {
+                                  const dName = DOJO_LIST.find(d => d.id === id)?.name || id;
+                                  return (
+                                    <span key={id} className="px-2 py-1 bg-brand-gold/10 border border-brand-gold/20 text-brand-gold rounded text-[10px] uppercase font-bold">
+                                      {dName}
+                                    </span>
+                                  );
+                                })
+                              ) : (
+                                <span className="px-2 py-1 bg-brand-red/10 border border-brand-red/20 text-brand-red rounded text-[10px] uppercase font-bold">
+                                  {DOJO_LIST.find(d => d.id === admin.dojoId)?.name || admin.dojoId || 'No branch assigned'}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-4 text-right">
+                            <div className="flex items-center justify-end space-x-2">
+                              <button
+                                onClick={() => handleOpenEditAdmin(admin)}
+                                className="p-2 hover:bg-white/5 text-gray-400 hover:text-brand-gold rounded-xl transition-all"
+                                title="Edit Admin"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                              {admin.id !== user?.uid && admin.uid !== user?.uid && (
+                                <button
+                                  onClick={() => handleDeleteAdmin(admin.id || admin.uid)}
+                                  className="p-2 hover:bg-brand-red/10 text-brand-red rounded-xl transition-all"
+                                  title="Delete Admin"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    {students.filter(s => s.role === 'dojo_admin').length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="p-12 text-center text-gray-500">
+                          No Dojo Admin accounts registered yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
@@ -943,6 +1336,87 @@ const AdminDashboard = () => {
           </div>
         )}
 
+        {/* ENQUIRIES VIEW */}
+        {activeView === 'enquiries' && (
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-black uppercase text-white tracking-wide">
+                Dojo <span className="text-brand-gold">Enquiries</span>
+              </h1>
+              <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider font-semibold">
+                {role === 'super_admin' ? 'All Academy Enquiries' : 'Enquiries for your assigned branch(es)'}
+              </p>
+            </div>
+
+            {loadingEnquiries ? (
+              <div className="flex items-center justify-center p-12 bg-white/5 border border-white/10 rounded-3xl">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-brand-red"></div>
+              </div>
+            ) : enquiries.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {enquiries.map((enq) => {
+                  const whatsappNumber = enq.phone ? enq.phone.replace(/\D/g, '') : '';
+                  const formattedWhatsapp = whatsappNumber.length === 10 ? `91${whatsappNumber}` : whatsappNumber;
+
+                  return (
+                    <div key={enq.id} className="bg-white/5 border border-white/10 rounded-3xl p-6 space-y-4 flex flex-col justify-between hover:border-brand-gold/30 transition-all shadow-lg">
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="text-white font-extrabold text-base">{enq.name}</h4>
+                            <p className="text-xs text-gray-400 mt-0.5">{enq.email}</p>
+                            <p className="text-xs text-gray-400">{enq.phone}</p>
+                          </div>
+                          <span className="px-3 py-1 bg-brand-gold/10 text-brand-gold border border-brand-gold/20 rounded-full text-[10px] font-black uppercase tracking-wider">
+                            {enq.dojoName || 'General'}
+                          </span>
+                        </div>
+                        <div className="bg-brand-dark/50 border border-white/5 rounded-2xl p-4 min-h-[100px] flex items-center">
+                          <p className="text-gray-300 text-xs italic leading-relaxed">
+                            "{enq.message}"
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-white/5">
+                        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+                          Received: {enq.formattedDate}
+                        </span>
+                        <div className="flex items-center space-x-2 w-full sm:w-auto">
+                          {formattedWhatsapp && (
+                            <a
+                              href={`https://wa.me/${formattedWhatsapp}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex-grow sm:flex-grow-0 px-3 py-1.5 bg-[#25D366] hover:bg-[#20ba59] text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all flex items-center justify-center space-x-1"
+                            >
+                              <MessageSquare size={12} />
+                              <span>WhatsApp</span>
+                            </a>
+                          )}
+                          <a
+                            href={`mailto:${enq.email}`}
+                            className="flex-grow sm:flex-grow-0 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all flex items-center justify-center space-x-1"
+                          >
+                            <Mail size={12} />
+                            <span>Email</span>
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-12 text-center border border-dashed border-white/10 rounded-3xl text-gray-500">
+                <MessageSquare size={36} className="mx-auto mb-3 opacity-40 text-brand-gold" />
+                <p className="font-extrabold uppercase tracking-wider text-sm mb-1">No Enquiries Registered</p>
+                <p className="text-xs">Incoming contact and interest requests will appear here.</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* 4. ACTIVITY LOGS VIEW */}
         {activeView === 'logs' && (
           <div className="space-y-6">
@@ -1061,44 +1535,29 @@ const AdminDashboard = () => {
                 )}
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 col-span-2">
                     <label className="uppercase tracking-widest text-gray-400 block">Starting Belt</label>
                     <select
                       value={studentForm.beltGrade}
                       onChange={(e) => setStudentForm({ ...studentForm, beltGrade: e.target.value })}
                       className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-gray-300"
                     >
-                      <option value="White Belt">White Belt</option>
-                      <option value="Yellow Belt">Yellow Belt</option>
-                      <option value="Orange Belt">Orange Belt</option>
-                      <option value="Green Belt">Green Belt</option>
-                      <option value="Blue Belt">Blue Belt</option>
-                      <option value="Purple Belt">Purple Belt</option>
-                      <option value="Brown Junior">Brown Junior</option>
-                      <option value="Brown Senior">Brown Senior</option>
-                      <option value="Brown Super Senior">Brown Super Senior</option>
+                      {BELT_GRADES.map(belt => (
+                        <option key={belt} value={belt}>{belt}</option>
+                      ))}
                     </select>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="uppercase tracking-widest text-gray-400 block">Role</label>
-                    {role === 'super_admin' ? (
-                      <select
-                        value={studentForm.role}
-                        onChange={(e) => setStudentForm({ ...studentForm, role: e.target.value })}
-                        className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-gray-300"
-                      >
-                        <option value="student">Student</option>
-                        <option value="dojo_admin">Dojo Admin</option>
-                      </select>
-                    ) : (
-                      <select
-                        value="student"
-                        disabled
-                        className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-gray-400 cursor-not-allowed"
-                      >
-                        <option value="student">Student</option>
-                      </select>
-                    )}
+
+                  <div className="space-y-1.5 col-span-2">
+                    <label className="uppercase tracking-widest text-gray-400 block">Pending Balance Dues (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={studentForm.pendingFees || '0'}
+                      onChange={(e) => setStudentForm({ ...studentForm, pendingFees: e.target.value })}
+                      className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-gold/50"
+                      placeholder="e.g. 1500"
+                    />
                   </div>
                 </div>
 
@@ -1264,37 +1723,47 @@ const AdminDashboard = () => {
                     />
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 col-span-2">
                     <label className="text-xs font-extrabold text-gray-300 uppercase tracking-widest block">Belt Grade</label>
                     <select
                       value={editForm.beltGrade}
                       onChange={(e) => setEditForm({ ...editForm, beltGrade: e.target.value })}
                       className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-gray-300 focus:outline-none focus:border-brand-gold/50"
                     >
-                      <option value="White Belt">White Belt</option>
-                      <option value="Yellow Belt">Yellow Belt</option>
-                      <option value="Orange Belt">Orange Belt</option>
-                      <option value="Green Belt">Green Belt</option>
-                      <option value="Blue Belt">Blue Belt</option>
-                      <option value="Purple Belt">Purple Belt</option>
-                      <option value="Brown Junior">Brown Junior</option>
-                      <option value="Brown Senior">Brown Senior</option>
-                      <option value="Brown Super Senior">Brown Super Senior</option>
-                      <option value="Black Belt">Black Belt</option>
+                      {BELT_GRADES.map(belt => (
+                        <option key={belt} value={belt}>{belt}</option>
+                      ))}
                     </select>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-extrabold text-gray-300 uppercase tracking-widest block">Fees Status</label>
-                    <select
-                      value={editForm.feesStatus}
-                      onChange={(e) => setEditForm({ ...editForm, feesStatus: e.target.value })}
-                      className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-gray-300 focus:outline-none focus:border-brand-gold/50"
-                    >
-                      <option value="paid">Paid</option>
-                      <option value="unpaid">Unpaid</option>
-                      <option value="pending">Pending</option>
-                    </select>
+                  <div className="space-y-1.5 sm:col-span-2 bg-white/5 p-4 border border-white/10 rounded-2xl flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+                    <div className="space-y-1.5 flex-grow">
+                      <label className="text-xs font-extrabold text-brand-gold uppercase tracking-widest block">Pending Balance Dues (₹)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={editForm.pendingFees || '0'}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEditForm({ 
+                            ...editForm, 
+                            pendingFees: val,
+                            feesStatus: Number(val) > 0 ? 'pending' : 'paid'
+                          });
+                        }}
+                        className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-gold/50"
+                        placeholder="e.g. 1500"
+                      />
+                    </div>
+                    {Number(editForm.pendingFees || 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setEditForm({ ...editForm, pendingFees: '0', feesStatus: 'paid' })}
+                        className="w-full sm:w-auto px-4 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all shadow-md shrink-0"
+                      >
+                        Clear Dues (Mark Paid)
+                      </button>
+                    )}
                   </div>
 
                   {role === 'super_admin' && (
@@ -1347,6 +1816,88 @@ const AdminDashboard = () => {
                   <button
                     type="button"
                     onClick={() => setEditingStudent(null)}
+                    className="px-6 py-3.5 border border-white/20 hover:bg-white/5 text-gray-300 rounded-xl transition-all"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Admin Modal — super_admin only */}
+      <AnimatePresence>
+        {editingAdmin && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-brand-dark border border-white/10 rounded-3xl p-8 w-full max-w-md shadow-2xl space-y-6"
+            >
+              <div>
+                <div className="flex items-center space-x-3 mb-1">
+                  <UserCog size={20} className="text-brand-gold" />
+                  <h2 className="text-xl font-black uppercase text-white tracking-wide">Edit Dojo Admin</h2>
+                </div>
+                <p className="text-xs text-gray-400">Editing profile for: <span className="text-white font-bold">{editingAdmin.email}</span></p>
+              </div>
+
+              <form onSubmit={handleSaveAdmin} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-extrabold text-gray-300 uppercase tracking-widest block">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={editAdminForm.fullName}
+                    onChange={(e) => setEditAdminForm({ ...editAdminForm, fullName: e.target.value })}
+                    className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-gold/50"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-extrabold text-gray-300 uppercase tracking-widest block">Dojo Branches (select all that apply)</label>
+                  <div className="bg-brand-dark/50 border border-white/10 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto">
+                    {DOJO_LIST.map(dojo => (
+                      <label key={dojo.id} className="flex items-center space-x-3 cursor-pointer group hover:bg-white/5 px-2 py-1.5 rounded-lg transition-all">
+                        <input
+                          type="checkbox"
+                          checked={editAdminForm.dojoIds.includes(dojo.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setEditAdminForm({ ...editAdminForm, dojoIds: [...editAdminForm.dojoIds, dojo.id] });
+                            } else {
+                              setEditAdminForm({ ...editAdminForm, dojoIds: editAdminForm.dojoIds.filter(id => id !== dojo.id) });
+                            }
+                          }}
+                          className="accent-brand-gold w-4 h-4"
+                        />
+                        <div>
+                          <p className="text-white text-xs font-bold">{dojo.name}</p>
+                          <p className="text-gray-500 text-[10px]">{dojo.instructor}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                  {editAdminForm.dojoIds.length > 0 && (
+                    <p className="text-[10px] text-brand-gold font-bold">{editAdminForm.dojoIds.length} dojo(s) selected</p>
+                  )}
+                </div>
+
+                <div className="flex items-center space-x-3 pt-2">
+                  <button
+                    type="submit"
+                    disabled={adminSaving}
+                    className="flex-grow py-3.5 bg-brand-gold hover:bg-yellow-600 disabled:bg-gray-700 text-brand-dark font-black uppercase tracking-wider rounded-xl transition-all flex items-center justify-center space-x-2"
+                  >
+                    <UserCog size={15} />
+                    <span>{adminSaving ? 'Saving...' : 'Save Changes'}</span>
+                  </button>
+                  <button
+                    onClick={() => setEditingAdmin(null)}
+                    type="button"
                     className="px-6 py-3.5 border border-white/20 hover:bg-white/5 text-gray-300 rounded-xl transition-all"
                   >
                     Cancel

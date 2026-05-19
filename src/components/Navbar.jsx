@@ -163,16 +163,10 @@ const Navbar = () => {
             <div className="flex flex-col space-y-2">
               <Link
                 to="/login"
-                className="flex items-center justify-center space-x-2 w-full py-3 border border-brand-dark/20 dark:border-white/20 hover:border-brand-red rounded-xl text-sm font-semibold tracking-wider hover:bg-brand-dark/5 dark:hover:bg-white/5 transition-all text-gray-600 dark:text-gray-300 hover:text-brand-dark dark:hover:text-white uppercase"
+                className="flex items-center justify-center space-x-2 w-full py-3 bg-brand-red dark:bg-white text-white dark:text-brand-dark hover:bg-red-700 dark:hover:bg-brand-red dark:hover:text-white rounded-xl text-sm font-bold tracking-wider transition-all uppercase shadow-lg text-center"
               >
                 <LogIn size={16} />
                 <span>Login</span>
-              </Link>
-              <Link
-                to="/joinus"
-                className="flex items-center justify-center w-full py-3 bg-brand-red dark:bg-white text-white dark:text-brand-dark hover:bg-red-700 dark:hover:bg-brand-red dark:hover:text-white rounded-xl text-sm font-bold tracking-wider transition-all uppercase shadow-lg text-center"
-              >
-                Join Us
               </Link>
             </div>
           )}
@@ -231,21 +225,14 @@ const Navbar = () => {
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3 px-4 pt-2">
+                <div className="px-4 pt-2">
                   <Link
                     to="/login"
                     onClick={() => setIsOpen(false)}
-                    className="flex items-center justify-center space-x-1.5 py-3 border border-brand-dark/20 dark:border-white/20 rounded-xl text-center text-sm font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 hover:text-brand-dark dark:hover:text-white"
+                    className="flex items-center justify-center space-x-1.5 py-3 bg-brand-red dark:bg-white text-white dark:text-brand-dark hover:bg-red-700 dark:hover:bg-brand-red dark:hover:text-white rounded-xl text-center text-sm font-bold uppercase tracking-wider transition-all shadow-md"
                   >
                     <LogIn size={16} />
                     <span>Login</span>
-                  </Link>
-                  <Link
-                    to="/joinus"
-                    onClick={() => setIsOpen(false)}
-                    className="py-3 bg-brand-red dark:bg-white text-white dark:text-brand-dark rounded-xl text-center text-sm font-extrabold uppercase tracking-wider shadow-md hover:bg-red-700 dark:hover:bg-brand-red dark:hover:text-white transition-all"
-                  >
-                    Join Us
                   </Link>
                 </div>
               )}
