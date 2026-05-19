@@ -1878,7 +1878,7 @@ const AdminDashboard = () => {
                     />
                   </div>
 
-                  <div className="space-y-1.5 col-span-2">
+                  <div className="space-y-1.5 sm:col-span-2">
                     <label className="text-xs font-extrabold text-gray-300 uppercase tracking-widest block">Belt Grade</label>
                     <select
                       value={editForm.beltGrade}
