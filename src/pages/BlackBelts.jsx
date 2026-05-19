@@ -133,7 +133,7 @@ const BlackBelts = () => {
           <AnimatePresence mode="wait">
             <motion.div 
               layout
-              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 justify-center"
+              className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-8 justify-center"
             >
               {filteredStudents.map((student, index) => (
                 <motion.div
@@ -145,7 +145,7 @@ const BlackBelts = () => {
                   key={index}
                   className="border dark:border-white/10 border-brand-dark/10 dark:bg-white/5 bg-white rounded-2xl overflow-hidden shadow-xl hover:border-brand-red/30 transition-all flex flex-col h-full"
                 >
-                  <div className="h-56 bg-brand-dark/5 dark:bg-white/10 relative overflow-hidden flex items-center justify-center">
+                  <div className="h-40 sm:h-56 bg-brand-dark/5 dark:bg-white/10 relative overflow-hidden flex items-center justify-center">
                     <img 
                       src={student.photoUrl || '/images/LOGO.png'} 
                       alt={student.name} 
@@ -155,22 +155,22 @@ const BlackBelts = () => {
                         e.target.src = '/images/LOGO.png';
                       }}
                     />
-                    <div className="absolute top-3 right-3 bg-brand-gold/90 text-brand-dark p-1.5 rounded-full shadow-md">
-                      <Award size={18} />
+                    <div className="absolute top-2 right-2 sm:top-3 sm:right-3 bg-brand-gold/90 text-brand-dark p-1 sm:p-1.5 rounded-full shadow-md">
+                      <Award className="w-3.5 h-3.5 sm:w-4.5 sm:h-4.5" />
                     </div>
                   </div>
-                  <div className="p-6 flex-grow flex flex-col justify-between text-center dark:bg-brand-dark/40 bg-brand-dark/5">
+                  <div className="p-4 sm:p-6 flex-grow flex flex-col justify-between text-center dark:bg-brand-dark/40 bg-brand-dark/5">
                     <div>
-                      <span className="text-xs text-brand-gold font-extrabold uppercase tracking-widest block mb-1">
+                      <span className="text-[10px] sm:text-xs text-brand-gold font-extrabold uppercase tracking-widest block mb-1">
                         {student.danLevel}
                       </span>
-                      <h3 className="dark:text-white text-brand-dark font-extrabold text-lg mb-2">
+                      <h3 className="dark:text-white text-brand-dark font-extrabold text-sm sm:text-lg mb-2 line-clamp-2">
                         {student.name}
                       </h3>
                     </div>
-                    <div className="mt-4 pt-3 border-t border-brand-dark/10 dark:border-white/5">
-                      <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">
-                        Reg No: <span className="dark:text-gray-300 text-brand-dark font-mono text-sm ml-1">{student.registerNumber || 'N/A'}</span>
+                    <div className="mt-2 pt-2 sm:mt-4 sm:pt-3 border-t border-brand-dark/10 dark:border-white/5">
+                      <p className="text-[10px] sm:text-xs text-gray-500 font-bold uppercase tracking-wider">
+                        Reg No: <span className="dark:text-gray-300 text-brand-dark font-mono text-xs sm:text-sm ml-1 block sm:inline">{student.registerNumber || 'N/A'}</span>
                       </p>
                     </div>
                   </div>
