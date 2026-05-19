@@ -61,7 +61,7 @@ const AdminDashboard = () => {
     fullName: '',
     email: '',
     mobileNumber: '',
-    dojoId: '',
+    dojoId: 'pattam',
     beltGrade: 'White Belt',
     role: 'student',
     pendingFees: '0'
@@ -464,8 +464,16 @@ const AdminDashboard = () => {
       const q = query(usersRef, where('email', '==', normalizedEmail));
       const querySnapshot = await getDocs(q);
       if (!querySnapshot.empty) {
-        alert(`An account with the email ${normalizedEmail} is already registered.`);
-        return;
+        const normalizedNewName = studentForm.fullName.trim().toLowerCase();
+        const hasSameName = querySnapshot.docs.some(doc => {
+          const data = doc.data();
+          return data.fullName && data.fullName.trim().toLowerCase() === normalizedNewName;
+        });
+
+        if (hasSameName) {
+          alert(`An account with the email ${normalizedEmail} and name ${studentForm.fullName} is already registered.`);
+          return;
+        }
       }
 
       const newStudentRef = doc(collection(db, 'users'));
@@ -493,7 +501,7 @@ const AdminDashboard = () => {
         { timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `${targetRole === 'dojo_admin' ? 'Dojo Admin' : 'Student'} profile created for ${studentForm.fullName}`, user: role === 'super_admin' ? 'Super Admin' : 'Dojo Admin' },
         ...prev
       ]);
-      setStudentForm({ fullName: '', email: '', mobileNumber: '', dojoId: '', beltGrade: 'White Belt', role: 'student', pendingFees: '0' });
+      setStudentForm({ fullName: '', email: '', mobileNumber: '', dojoId: 'pattam', beltGrade: 'White Belt', role: 'student', pendingFees: '0' });
       alert(`${targetRole === 'dojo_admin' ? 'Admin' : 'Student'} profile created successfully!`);
     } catch (error) {
       console.error(error);
@@ -897,7 +905,18 @@ const AdminDashboard = () => {
 
               <div className="flex items-center space-x-3">
                 <button
-                  onClick={() => setIsStudentModalOpen(true)}
+                  onClick={() => {
+                    setStudentForm({
+                      fullName: '',
+                      email: '',
+                      mobileNumber: '',
+                      dojoId: role === 'super_admin' ? 'pattam' : (profile?.dojoIds?.[0] || profile?.dojoId || 'pattam'),
+                      beltGrade: 'White Belt',
+                      role: 'student',
+                      pendingFees: '0'
+                    });
+                    setIsStudentModalOpen(true);
+                  }}
                   className="px-6 py-3 bg-brand-red hover:bg-red-700 text-white font-bold text-xs uppercase tracking-widest rounded-xl transition-all shadow-md flex items-center justify-center space-x-1.5"
                 >
                   <Plus size={14} />
@@ -1523,7 +1542,7 @@ const AdminDashboard = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-brand-dark border border-white/15 w-full max-w-md p-8 rounded-3xl space-y-6 relative overflow-hidden"
+              className="bg-brand-dark border border-white/15 w-full max-w-md p-8 rounded-3xl space-y-6 relative"
             >
               <h3 className="text-white font-black text-xl uppercase tracking-wide">Create Student Profile</h3>
               
