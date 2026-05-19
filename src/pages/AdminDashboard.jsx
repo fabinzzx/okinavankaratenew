@@ -993,65 +993,112 @@ const AdminDashboard = () => {
               })()}
             </div>
 
-            {/* Students Directory Grid/Table */}
+            {/* Students Directory — Card on mobile, Table on md+ */}
             <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden shadow-xl">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-brand-dark border-b border-white/10 text-gray-400 text-xs uppercase tracking-wider font-bold">
-                  <tr>
-                    <th className="p-4">Student Details</th>
-                    <th className="p-4">Mobile</th>
-                    <th className="p-4">Dojo</th>
-                    <th className="p-4">Belt Rank</th>
-                    <th className="p-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5 font-semibold text-xs sm:text-sm text-gray-300">
-                  {filteredStudents.map((student) => (
-                    <tr key={student.id} className="hover:bg-white/5">
-                      <td className="p-4">
-                        <div>
-                          <p className="text-white font-extrabold text-sm">{student.fullName}</p>
-                          <p className="text-[10px] text-gray-500 font-semibold">{student.email}</p>
-                        </div>
-                      </td>
-                      <td className="p-4">{student.mobileNumber}</td>
-                      <td className="p-4 uppercase text-gray-400 text-xs">{student.dojoId}</td>
-                      <td className="p-4">
-                        <span className="text-brand-gold font-bold uppercase tracking-wider text-xs">
-                          {student.beltGrade}
-                        </span>
-                      </td>
-                      <td className="p-4 text-right">
-                        <div className="flex items-center justify-end space-x-2">
+
+              {/* MOBILE: Card List */}
+              <div className="block md:hidden divide-y divide-white/5">
+                {filteredStudents.map((student) => (
+                  <div key={student.id || student.uid} className="p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-white font-extrabold text-sm">{student.fullName}</p>
+                        <p className="text-[10px] text-gray-500">{student.email}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{student.mobileNumber}</p>
+                      </div>
+                      <div className="flex items-center space-x-1 shrink-0">
+                        <button
+                          onClick={() => handleOpenEdit(student)}
+                          className="p-2 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-brand-gold rounded-xl transition-all"
+                          title="Edit"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        {(student.id || student.uid) !== user?.uid && (
                           <button
-                            onClick={() => handleOpenEdit(student)}
-                            className="p-2 hover:bg-white/5 text-gray-400 hover:text-brand-gold rounded-xl transition-all"
-                            title="Edit student"
+                            onClick={() => handleDeleteStudent(student)}
+                            className="p-2 bg-brand-red/10 hover:bg-brand-red/20 text-brand-red rounded-xl transition-all"
+                            title="Delete"
                           >
-                            <Edit2 size={14} />
+                            <Trash2 size={14} />
                           </button>
-                          <button
-                            onClick={() => alert(`View QR Code for Student ID: ${student.id}`)}
-                            className="p-2 hover:bg-white/5 text-gray-400 hover:text-white rounded-xl transition-all"
-                            title="QR Code student ID card"
-                          >
-                            <Shield size={14} />
-                          </button>
-                          {(student.id || student.uid) !== user?.uid && (
-                            <button
-                              onClick={() => handleDeleteStudent(student)}
-                              className="p-2 hover:bg-brand-red/10 text-brand-red rounded-xl transition-all"
-                              title="Delete"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="text-[10px] uppercase tracking-wider text-gray-500 bg-white/5 px-2 py-1 rounded-lg">{student.dojoId}</span>
+                      <span className="text-[10px] uppercase tracking-wider text-brand-gold font-bold bg-brand-gold/10 px-2 py-1 rounded-lg">{student.beltGrade}</span>
+                    </div>
+                  </div>
+                ))}
+                {filteredStudents.length === 0 && (
+                  <div className="p-8 text-center text-gray-500 text-xs uppercase tracking-widest">No students found</div>
+                )}
+              </div>
+
+              {/* DESKTOP: Table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-brand-dark border-b border-white/10 text-gray-400 text-xs uppercase tracking-wider font-bold">
+                    <tr>
+                      <th className="p-4">Student Details</th>
+                      <th className="p-4">Mobile</th>
+                      <th className="p-4">Dojo</th>
+                      <th className="p-4">Belt Rank</th>
+                      <th className="p-4 text-right">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 font-semibold text-xs sm:text-sm text-gray-300">
+                    {filteredStudents.map((student) => (
+                      <tr key={student.id} className="hover:bg-white/5">
+                        <td className="p-4">
+                          <div>
+                            <p className="text-white font-extrabold text-sm">{student.fullName}</p>
+                            <p className="text-[10px] text-gray-500 font-semibold">{student.email}</p>
+                          </div>
+                        </td>
+                        <td className="p-4">{student.mobileNumber}</td>
+                        <td className="p-4 uppercase text-gray-400 text-xs">{student.dojoId}</td>
+                        <td className="p-4">
+                          <span className="text-brand-gold font-bold uppercase tracking-wider text-xs">
+                            {student.beltGrade}
+                          </span>
+                        </td>
+                        <td className="p-4 text-right">
+                          <div className="flex items-center justify-end space-x-2">
+                            <button
+                              onClick={() => handleOpenEdit(student)}
+                              className="p-2 hover:bg-white/5 text-gray-400 hover:text-brand-gold rounded-xl transition-all"
+                              title="Edit student"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              onClick={() => alert(`View QR Code for Student ID: ${student.id}`)}
+                              className="p-2 hover:bg-white/5 text-gray-400 hover:text-white rounded-xl transition-all"
+                              title="QR Code student ID card"
+                            >
+                              <Shield size={14} />
+                            </button>
+                            {(student.id || student.uid) !== user?.uid && (
+                              <button
+                                onClick={() => handleDeleteStudent(student)}
+                                className="p-2 hover:bg-brand-red/10 text-brand-red rounded-xl transition-all"
+                                title="Delete"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredStudents.length === 0 && (
+                      <tr><td colSpan={5} className="p-8 text-center text-gray-500 text-xs uppercase tracking-widest">No students found</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
@@ -1617,20 +1664,26 @@ const AdminDashboard = () => {
                     const adminDojos = profile?.dojoIds?.length > 0
                       ? DOJO_LIST.filter(d => profile.dojoIds.includes(d.id))
                       : DOJO_LIST.filter(d => d.id === (profile?.dojoId || 'pattam'));
-                    return adminDojos.length === 1 ? null : (
+                    return (
                       <div className="space-y-1.5">
                         <label className="uppercase tracking-widest text-gray-400 block">Dojo Branch</label>
-                        <select
-                          required
-                          value={studentForm.dojoId}
-                          onChange={(e) => setStudentForm({ ...studentForm, dojoId: e.target.value })}
-                          className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-gray-300"
-                        >
-                          <option value="" disabled>Select branch</option>
-                          {adminDojos.map(dojo => (
-                            <option key={dojo.id} value={dojo.id}>{dojo.name}</option>
-                          ))}
-                        </select>
+                        {adminDojos.length === 1 ? (
+                          <div className="w-full bg-brand-dark/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-brand-gold font-bold uppercase tracking-wider">
+                            {adminDojos[0]?.name || 'Pattam Dojo'}
+                          </div>
+                        ) : (
+                          <select
+                            required
+                            value={studentForm.dojoId}
+                            onChange={(e) => setStudentForm({ ...studentForm, dojoId: e.target.value })}
+                            className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-gray-300"
+                          >
+                            <option value="" disabled>Select branch</option>
+                            {adminDojos.map(dojo => (
+                              <option key={dojo.id} value={dojo.id}>{dojo.name}</option>
+                            ))}
+                          </select>
+                        )}
                       </div>
                     );
                   })()
