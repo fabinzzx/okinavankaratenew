@@ -3,12 +3,13 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { user, role, profile, loading } = useAuth();
+  const { user, role, profile, availableProfiles, loading } = useAuth();
 
   console.log("[ProtectedRoute Trace] Evaluating route access:", {
     email: user?.email,
     role,
     isOnboarded: profile?.isOnboarded,
+    hasMultipleProfiles: availableProfiles && availableProfiles.length > 1,
     loading,
     allowedRoles,
     currentPath: window.location.pathname
@@ -28,7 +29,9 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
   // Redirect non-onboarded regular students to onboarding page (/joinus)
   const isAdmin = role === 'super_admin' || role === 'dojo_admin' || user.email === 'francisfabin860@gmail.com';
-  if (!isAdmin && (!profile || !profile.isOnboarded)) {
+  const hasMultipleProfiles = availableProfiles && availableProfiles.length > 1;
+  
+  if (!isAdmin && !hasMultipleProfiles && (!profile || !profile.isOnboarded)) {
     console.log("[ProtectedRoute Trace] Redirecting to /joinus: User is not onboarded.");
     return <Navigate to="/joinus" replace />;
   }

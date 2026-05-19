@@ -18,7 +18,25 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [availableProfiles, setAvailableProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const selectProfile = (profileId) => {
+    const selected = availableProfiles.find(p => p.id === profileId);
+    if (selected) {
+      setProfile(selected);
+      if (user) {
+        localStorage.setItem(`selectedStudentId_${user.uid}`, profileId);
+      }
+    }
+  };
+
+  const switchProfile = () => {
+    setProfile(null);
+    if (user) {
+      localStorage.removeItem(`selectedStudentId_${user.uid}`);
+    }
+  };
 
   // Sign Up with Email and Password
   const register = async (email, password, additionalData) => {
@@ -78,32 +96,36 @@ export const AuthProvider = ({ children }) => {
           throw new Error('ACCESS_DENIED');
         }
       } else {
-        // Document with this email already exists (e.g. manually created by dojo head)
-        const migratedDoc = querySnapshot.docs.find(d => d.id === u.uid);
-        const existingDoc = migratedDoc || querySnapshot.docs[0];
-        const existingData = existingDoc.data();
-        
-        // If the document ID is not the user's Google UID, migrate it to u.uid
-        if (existingDoc.id !== u.uid) {
-          await setDoc(doc(db, 'users', u.uid), {
-            ...existingData,
-            uid: u.uid,
-            id: u.uid,
-            email: existingData.email ? existingData.email.trim().toLowerCase() : u.email.trim().toLowerCase(),
-            profilePhotoUrl: existingData.profilePhotoUrl || u.photoURL || '',
-            isOnboarded: existingData.isOnboarded !== undefined ? existingData.isOnboarded : true,
-          });
-          // Delete old random/temporary document
-          try {
-            await deleteDoc(doc(db, 'users', existingDoc.id));
-          } catch (delErr) {
-            console.warn("Could not delete temporary document during migration (will be auto-cleaned by admin dashboard):", delErr);
+        // Document(s) with this email already exists (e.g. manually created by dojo head)
+        if (querySnapshot.docs.length === 1) {
+          const existingDoc = querySnapshot.docs[0];
+          const existingData = existingDoc.data();
+          
+          // If the document ID is not the user's Google UID, migrate it to u.uid
+          if (existingDoc.id !== u.uid) {
+            await setDoc(doc(db, 'users', u.uid), {
+              ...existingData,
+              uid: u.uid,
+              id: u.uid,
+              email: existingData.email ? existingData.email.trim().toLowerCase() : u.email.trim().toLowerCase(),
+              profilePhotoUrl: existingData.profilePhotoUrl || u.photoURL || '',
+              isOnboarded: existingData.isOnboarded !== undefined ? existingData.isOnboarded : true,
+            });
+            // Delete old random/temporary document
+            try {
+              await deleteDoc(doc(db, 'users', existingDoc.id));
+            } catch (delErr) {
+              console.warn("Could not delete temporary document during migration (will be auto-cleaned by admin dashboard):", delErr);
+            }
+          } else {
+            // If the profile already has UID, check if it needs to complete onboarding details
+            if (!isAdminEmail && (existingData.isOnboarded === false || !existingData.mobileNumber)) {
+              isNewUser = true;
+            }
           }
         } else {
-          // If the profile already has UID, check if it needs to complete onboarding details
-          if (!isAdminEmail && (existingData.isOnboarded === false || !existingData.mobileNumber)) {
-            isNewUser = true;
-          }
+          // Multiple sibling profiles exist. Skip auto-migration to uid to preserve both documents.
+          console.log("[AuthContext] Sibling profiles found. Skipping auto-migration to Google uid.");
         }
         
         // Ensure admin has correct credentials
@@ -147,74 +169,101 @@ export const AuthProvider = ({ children }) => {
       if (currentUser) {
         setUser(currentUser);
         try {
-          const docRef = doc(db, 'users', currentUser.uid);
-          
-          // Subscribe to real-time updates for user profile
-          unsubscribeSnapshot = onSnapshot(docRef, async (docSnap) => {
+          const q = query(
+            collection(db, 'users'),
+            where('email', '==', currentUser.email.trim().toLowerCase())
+          );
+
+          unsubscribeSnapshot = onSnapshot(q, async (querySnapshot) => {
             const isAdminEmail = currentUser.email === 'francisfabin860@gmail.com';
-            
-            if (docSnap.exists()) {
-              let data = docSnap.data();
-              // Admin onboarding check
-              if (isAdminEmail && (data.role !== 'super_admin' || data.dojoId !== 'pattam' || !data.isOnboarded)) {
-                await setDoc(docRef, { role: 'super_admin', dojoId: 'pattam', isOnboarded: true }, { merge: true });
+
+            if (!querySnapshot.empty) {
+              const docs = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+
+              // First, check if there's an admin profile
+              const adminDoc = docs.find(d => d.role === 'super_admin' || d.role === 'dojo_admin');
+              if (adminDoc) {
+                // For super admin, verify fields
+                if (isAdminEmail && (adminDoc.role !== 'super_admin' || adminDoc.dojoId !== 'pattam' || !adminDoc.isOnboarded)) {
+                  const docRef = doc(db, 'users', adminDoc.id);
+                  await setDoc(docRef, { role: 'super_admin', dojoId: 'pattam', isOnboarded: true }, { merge: true });
+                  return;
+                }
+                setRole(adminDoc.role);
+                setProfile(adminDoc);
+                setAvailableProfiles([]);
+                setLoading(false);
                 return;
               }
-              setRole(data.role || 'student');
-              setProfile(data);
-              setLoading(false);
-            } else {
-              // The user document does not exist under their UID yet.
-              // Check if a document matches their email under a temporary ID.
-              const usersRef = collection(db, 'users');
-              const q = query(usersRef, where('email', '==', currentUser.email.trim().toLowerCase()));
-              
-              getDocs(q).then((querySnapshot) => {
-                if (!querySnapshot.empty) {
-                  // A profile exists with this email but is under a temporary ID.
-                  // Migration is in progress! Keep loading = true, do not set loading = false yet.
-                  console.log("[AuthContext Trace] Temp profile found, migration in progress...");
-                } else {
-                  if (isAdminEmail) {
-                    const userProfile = {
-                      uid: currentUser.uid,
-                      email: currentUser.email.trim().toLowerCase(),
-                      fullName: currentUser.displayName || 'Fabin Paul Francis',
-                      role: 'super_admin',
-                      dojoId: 'pattam',
-                      isOnboarded: true,
-                      createdAt: serverTimestamp(),
-                    };
-                    setDoc(docRef, userProfile);
+
+              // Filter for student profiles
+              const studentProfiles = docs.filter(d => d.role === 'student');
+
+              if (studentProfiles.length > 0) {
+                setRole('student');
+                if (studentProfiles.length > 1) {
+                  setAvailableProfiles(studentProfiles);
+                  // Load preference from localStorage
+                  const savedId = localStorage.getItem(`selectedStudentId_${currentUser.uid}`);
+                  const selected = studentProfiles.find(p => p.id === savedId);
+                  if (selected) {
+                    setProfile(selected);
                   } else {
-                    setRole('student');
-                    setProfile(null);
-                    setLoading(false);
+                    setProfile(null); // Parent must select profile
                   }
+                } else {
+                  setAvailableProfiles([]);
+                  setProfile(studentProfiles[0]);
                 }
-              }).catch((err) => {
-                console.warn("Failed to check temporary email status:", err);
+                setLoading(false);
+              } else {
                 setRole('student');
                 setProfile(null);
+                setAvailableProfiles([]);
                 setLoading(false);
-              });
+              }
+            } else {
+              // No user profile exists under this email yet.
+              if (isAdminEmail) {
+                // Auto-create super admin profile
+                const docRef = doc(db, 'users', currentUser.uid);
+                const userProfile = {
+                  uid: currentUser.uid,
+                  id: currentUser.uid,
+                  email: currentUser.email.trim().toLowerCase(),
+                  fullName: currentUser.displayName || 'Fabin Paul Francis',
+                  role: 'super_admin',
+                  dojoId: 'pattam',
+                  isOnboarded: true,
+                  createdAt: serverTimestamp(),
+                };
+                await setDoc(docRef, userProfile);
+              } else {
+                setRole('student');
+                setProfile(null);
+                setAvailableProfiles([]);
+                setLoading(false);
+              }
             }
           }, (error) => {
             console.warn("Error listening to user profile:", error);
             setRole('student');
             setProfile(null);
+            setAvailableProfiles([]);
             setLoading(false);
           });
         } catch (error) {
           console.warn("Error establishing profile listener:", error);
           setRole('student');
           setProfile(null);
+          setAvailableProfiles([]);
           setLoading(false);
         }
       } else {
         setUser(null);
         setRole(null);
         setProfile(null);
+        setAvailableProfiles([]);
         setLoading(false);
       }
     });
@@ -231,6 +280,9 @@ export const AuthProvider = ({ children }) => {
     user,
     role,
     profile,
+    availableProfiles,
+    selectProfile,
+    switchProfile,
     loading,
     login,
     register,

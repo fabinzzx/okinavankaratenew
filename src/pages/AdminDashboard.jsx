@@ -150,22 +150,31 @@ const AdminDashboard = () => {
         const querySnapshot = await getDocs(collection(db, 'users'));
         const list = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
         
-        // Find duplicates by email and clean them up
-        const emailMap = {};
+        // Find duplicates by email + normalized name and clean them up
+        const duplicateMap = {};
         const duplicatesToDelete = [];
         
         list.forEach(item => {
-          if (!item.email) return;
+          if (!item.email || !item.fullName) return;
           const email = item.email.trim().toLowerCase();
-          if (!emailMap[email]) {
-            emailMap[email] = [];
+          const name = item.fullName.trim().toLowerCase();
+          const key = `${email}|${name}`;
+          if (!duplicateMap[key]) {
+            duplicateMap[key] = [];
           }
-          emailMap[email].push(item);
+          duplicateMap[key].push(item);
         });
 
         const cleanedList = [];
-        for (const email in emailMap) {
-          const docs = emailMap[email];
+        // Keep documents that lack email or name
+        list.forEach(item => {
+          if (!item.email || !item.fullName) {
+            cleanedList.push(item);
+          }
+        });
+
+        for (const key in duplicateMap) {
+          const docs = duplicateMap[key];
           if (docs.length > 1) {
             // Sort so the official logged-in document (which has standard 28-char UID) is first
             docs.sort((a, b) => b.id.length - a.id.length);

@@ -9,7 +9,7 @@ import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'fireb
 import { db } from '../firebase/config';
 
 const StudentDashboard = () => {
-  const { user, profile, logout } = useAuth();
+  const { user, profile, availableProfiles, selectProfile, switchProfile, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -36,26 +36,27 @@ const StudentDashboard = () => {
   // Load active student records strictly from firestore
   useEffect(() => {
     const fetchUserData = async () => {
-      if (!user) return;
+      if (!user || !profile) return;
+      const profileId = profile.id || profile.uid;
       try {
         // Attendance
-        const attSnap = await getDocs(query(collection(db, 'attendance'), where('uid', '==', user.uid)));
+        const attSnap = await getDocs(query(collection(db, 'attendance'), where('uid', '==', profileId)));
         setAttendance(attSnap.docs.map(doc => doc.data()));
 
         // Exams
-        const examSnap = await getDocs(query(collection(db, 'exams'), where('uid', '==', user.uid)));
+        const examSnap = await getDocs(query(collection(db, 'exams'), where('uid', '==', profileId)));
         setExams(examSnap.docs.map(doc => doc.data()));
 
         // Fees
-        const feeSnap = await getDocs(query(collection(db, 'fees'), where('uid', '==', user.uid)));
+        const feeSnap = await getDocs(query(collection(db, 'fees'), where('uid', '==', profileId)));
         setFees(feeSnap.docs.map(doc => doc.data()));
 
         // Tournaments
-        const tourSnap = await getDocs(query(collection(db, 'tournaments'), where('uid', '==', user.uid)));
+        const tourSnap = await getDocs(query(collection(db, 'tournaments'), where('uid', '==', profileId)));
         setTournaments(tourSnap.docs.map(doc => doc.data()));
 
         // Announcements
-        if (profile?.dojoId) {
+        if (profile.dojoId) {
           const notifSnap = await getDocs(query(collection(db, 'notifications'), where('dojoId', '==', profile.dojoId)));
           setNotifications(notifSnap.docs.map(doc => doc.data()));
         }
@@ -70,7 +71,8 @@ const StudentDashboard = () => {
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
     try {
-      const userRef = doc(db, 'users', user.uid);
+      const profileId = profile.id || profile.uid;
+      const userRef = doc(db, 'users', profileId);
       await updateDoc(userRef, {
         mobileNumber: editForm.mobileNumber,
         address: editForm.address
@@ -102,6 +104,71 @@ const StudentDashboard = () => {
     'Black Belt (1st Dan)': 100,
     'Black Belt': 100,
   };
+
+  if (!profile && availableProfiles && availableProfiles.length > 1) {
+    return (
+      <div className="min-h-screen text-white py-16 px-4 flex flex-col justify-center items-center dark:bg-brand-dark bg-brand-light">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-xl w-full bg-white dark:bg-white/5 border border-brand-dark/10 dark:border-white/10 p-8 sm:p-10 rounded-3xl shadow-2xl text-center space-y-8"
+        >
+          <div>
+            <img src="/images/LOGO.png" alt="Academy Logo" className="h-16 w-16 mx-auto mb-4 object-contain" />
+            <h1 className="text-2xl sm:text-3xl font-black uppercase text-brand-dark dark:text-white tracking-wide">
+              Select <span className="text-brand-red">Student Profile</span>
+            </h1>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 uppercase tracking-widest font-bold">
+              Multiple sibling profiles found for {user?.email}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {availableProfiles.map((student) => (
+              <button
+                key={student.id}
+                onClick={() => selectProfile(student.id)}
+                className="flex items-center space-x-4 p-4 rounded-2xl border border-brand-dark/15 dark:border-white/10 dark:bg-white/5 bg-brand-dark/5 hover:border-brand-red/50 hover:bg-brand-red/5 transition-all text-left group"
+              >
+                <div className="w-12 h-12 rounded-full overflow-hidden border border-white/20 bg-brand-dark shrink-0">
+                  <img
+                    src={student.profilePhotoUrl || '/images/LOGO.png'}
+                    alt={student.fullName}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-all"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = '/images/LOGO.png';
+                    }}
+                  />
+                </div>
+                <div className="overflow-hidden">
+                  <h3 className="font-extrabold text-sm text-brand-dark dark:text-white truncate">
+                    {student.fullName}
+                  </h3>
+                  <p className="text-[10px] text-brand-gold uppercase tracking-wider font-extrabold truncate mt-0.5">
+                    {student.beltGrade || 'White Belt'}
+                  </p>
+                  <p className="text-[9px] text-gray-500 font-bold truncate mt-0.5">
+                    Dojo: {student.dojoId || 'Pattam'}
+                  </p>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <div className="pt-4 border-t border-brand-dark/10 dark:border-white/5 flex justify-center">
+            <button
+              onClick={logout}
+              className="flex items-center space-x-2 text-xs font-bold text-gray-500 hover:text-brand-red transition-all uppercase tracking-widest"
+            >
+              <LogOut size={14} />
+              <span>Sign Out</span>
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   const progressPercentage = beltProgressMap[profile?.beltGrade] || 10;
   const totalPresentCount = attendance.filter(a => a.status?.toLowerCase() === 'present').length;
@@ -188,6 +255,24 @@ const StudentDashboard = () => {
                 <span>{tab.label}</span>
               </button>
             ))}
+
+            {availableProfiles && availableProfiles.length > 1 && (
+              <button
+                onClick={switchProfile}
+                className="flex items-center space-x-3 w-full px-4 py-3 rounded-xl text-sm font-bold tracking-wide uppercase transition-all text-brand-gold hover:bg-brand-gold/10 hover:text-brand-gold mt-4 border-t border-brand-dark/10 dark:border-white/5 pt-4"
+              >
+                <User size={18} />
+                <span>Switch Student</span>
+              </button>
+            )}
+
+            <button
+              onClick={logout}
+              className="flex items-center space-x-3 w-full px-4 py-3 rounded-xl text-sm font-bold tracking-wide uppercase transition-all text-brand-red hover:bg-brand-red/10 hover:text-brand-red"
+            >
+              <LogOut size={18} />
+              <span>Sign Out</span>
+            </button>
           </div>
 
           {/* Core Content Body */}
