@@ -109,7 +109,7 @@ const Contact = () => {
                 Need immediate answers? Start a direct chat with Kyoshi on WhatsApp.
               </p>
               <a
-                href="https://wa.me/919947001779"
+                href="https://wa.me/919446411305"
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-center justify-center space-x-2 py-3 bg-[#25D366] hover:bg-[#20ba59] text-white font-bold uppercase tracking-wider text-sm rounded-xl transition-all shadow-lg cursor-pointer"
