@@ -57,13 +57,23 @@ export const AuthProvider = ({ children }) => {
     return u;
   };
 
+  const clearSelectedProfiles = () => {
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('selectedStudentId_')) {
+        localStorage.removeItem(key);
+      }
+    });
+  };
+
   // Log In with Email and Password
   const login = (email, password) => {
+    clearSelectedProfiles();
     return signInWithEmailAndPassword(auth, email, password);
   };
 
   // Google Log In with intelligent onboarding checks and manual registration mapping
   const loginWithGoogle = async () => {
+    clearSelectedProfiles();
     const userCredential = await signInWithPopup(auth, googleProvider);
     const u = userCredential.user;
     
@@ -148,6 +158,7 @@ export const AuthProvider = ({ children }) => {
 
   // Log Out
   const logout = () => {
+    clearSelectedProfiles();
     return signOut(auth);
   };
 

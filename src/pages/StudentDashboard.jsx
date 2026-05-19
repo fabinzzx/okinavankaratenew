@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   User, Calendar, Trophy, Award, Bell, CreditCard, ChevronRight, 
-  Download, Edit2, LogOut, CheckCircle, ShieldAlert, Award as MedalIcon, Info 
+  Download, Edit2, LogOut, CheckCircle, ShieldAlert, Award as MedalIcon, Info, Home as HomeIcon
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
@@ -234,6 +235,16 @@ const StudentDashboard = () => {
           
           {/* Sidebar Navigation */}
           <div className="lg:col-span-1 dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-2xl p-4 h-fit space-y-2">
+            <Link
+              to="/"
+              className="flex items-center space-x-3 w-full px-4 py-3 rounded-xl text-sm font-bold tracking-wide uppercase transition-all text-gray-500 dark:text-gray-400 hover:bg-brand-dark/5 dark:hover:bg-white/5 hover:text-brand-dark dark:hover:text-white"
+            >
+              <HomeIcon size={18} className="text-brand-red" />
+              <span>Home Page</span>
+            </Link>
+
+            <div className="h-[1px] bg-brand-dark/10 dark:bg-white/5 my-2" />
+
             {[
               { id: 'overview', label: 'Overview', icon: <Award size={18} /> },
               { id: 'profile', label: 'My Profile', icon: <User size={18} /> },
