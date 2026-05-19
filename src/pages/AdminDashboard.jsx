@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, BarChart2, Calendar, Award, CreditCard, Bell, UserCog, Home,
-  Settings, Search, Plus, Edit2, Trash2, Shield, Eye, Download, FileText, MessageSquare, Mail
+  Settings, Search, Plus, Edit2, Trash2, Shield, Eye, Download, FileText, MessageSquare, Mail, LogOut
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell 
@@ -38,7 +38,7 @@ const BELT_GRADES = [
 ];
 
 const AdminDashboard = () => {
-  const { user, profile, role } = useAuth();
+  const { user, profile, role, logout } = useAuth();
   const navigate = useNavigate();
   const [activeView, setActiveView] = useState('overview');
   
@@ -785,7 +785,7 @@ const AdminDashboard = () => {
           </nav>
         </div>
 
-        <div className="space-y-3 border-t border-white/5 pt-4">
+        <div className="space-y-2 border-t border-white/5 pt-4">
           <button
             onClick={() => navigate('/')}
             className="flex items-center space-x-3 w-full px-4 py-3 rounded-xl text-xs font-extrabold uppercase tracking-widest transition-all text-gray-400 hover:bg-white/5 hover:text-white"
@@ -793,7 +793,14 @@ const AdminDashboard = () => {
             <Home size={16} />
             <span>Home Page</span>
           </button>
-          <div className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">
+          <button
+            onClick={async () => { await logout(); navigate('/login'); }}
+            className="flex items-center space-x-3 w-full px-4 py-3 rounded-xl text-xs font-extrabold uppercase tracking-widest transition-all text-brand-red hover:bg-brand-red/10 hover:text-red-400"
+          >
+            <LogOut size={16} />
+            <span>Logout</span>
+          </button>
+          <div className="text-[10px] text-gray-500 uppercase font-bold tracking-widest pt-2">
             Okinavan Shito Ryu Karate Academy
           </div>
         </div>
