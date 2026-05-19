@@ -509,23 +509,32 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleDeleteStudent = async (id) => {
-    if (id === user?.uid) {
+  const handleDeleteStudent = async (student) => {
+    const docId = student.id || student.uid;
+    if (!docId) {
+      alert("Cannot delete: student ID is missing.");
+      return;
+    }
+    if (docId === user?.uid) {
       alert("You cannot delete your own profile.");
       return;
     }
-    if (!window.confirm("Are you sure you want to delete this profile?")) return;
+    if (!window.confirm(`Are you sure you want to delete ${student.fullName || 'this profile'}?`)) return;
     try {
-      await deleteDoc(doc(db, 'users', id));
-      setStudents(students.filter(s => s.id !== id));
+      await deleteDoc(doc(db, 'users', docId));
+      setStudents(prev => prev.filter(s => (s.id || s.uid) !== docId));
       setActivityLogs(prev => [
-        { timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `Profile deleted: ${id}`, user: role === 'super_admin' ? 'Super Admin' : 'Dojo Admin' },
+        { timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `Profile deleted: ${student.fullName || docId}`, user: role === 'super_admin' ? 'Super Admin' : 'Dojo Admin' },
         ...prev
       ]);
       alert("Profile deleted successfully.");
     } catch (error) {
-      console.error(error);
-      alert("Delete failed.");
+      console.error("[Delete Student] Error:", error.code, error.message, "| Doc ID:", docId);
+      if (error.code === 'permission-denied') {
+        alert("Delete failed: You do not have permission to delete this profile. Check Firestore security rules.");
+      } else {
+        alert("Delete failed: " + error.message);
+      }
     }
   };
 
@@ -1028,9 +1037,9 @@ const AdminDashboard = () => {
                           >
                             <Shield size={14} />
                           </button>
-                          {student.id !== user?.uid && (
+                          {(student.id || student.uid) !== user?.uid && (
                             <button
-                              onClick={() => handleDeleteStudent(student.id)}
+                              onClick={() => handleDeleteStudent(student)}
                               className="p-2 hover:bg-brand-red/10 text-brand-red rounded-xl transition-all"
                               title="Delete"
                             >
