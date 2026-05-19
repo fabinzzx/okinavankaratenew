@@ -148,7 +148,7 @@ const AdminDashboard = () => {
     const fetchStudents = async () => {
       try {
         const querySnapshot = await getDocs(collection(db, 'users'));
-        const list = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const list = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
         
         // Find duplicates by email and clean them up
         const emailMap = {};
@@ -169,12 +169,70 @@ const AdminDashboard = () => {
           if (docs.length > 1) {
             // Sort so the official logged-in document (which has standard 28-char UID) is first
             docs.sort((a, b) => b.id.length - a.id.length);
-            cleanedList.push(docs[0]);
             
-            // Collect the others (temporary random documents) for deletion
-            for (let i = 1; i < docs.length; i++) {
-              duplicatesToDelete.push(docs[i].id);
+            const officialDoc = docs[0];
+            const tempDocs = docs.slice(1);
+            
+            // Merge fields from temporary documents into the official document
+            let needsUpdate = false;
+            const mergedFields = {};
+            
+            tempDocs.forEach(tempDoc => {
+              const fieldsToMerge = [
+                'beltGrade', 'pendingFees', 'feesStatus', 'mobileNumber', 
+                'address', 'emergencyContact', 'dojoId', 'fullName', 'beltHistory'
+              ];
+              
+              fieldsToMerge.forEach(field => {
+                const officialVal = officialDoc[field];
+                const tempVal = tempDoc[field];
+                
+                if (tempVal !== undefined && tempVal !== null && tempVal !== '') {
+                  if (field === 'beltHistory') {
+                    const officialHistory = officialVal || [];
+                    const tempHistory = tempVal || [];
+                    let historyChanged = false;
+                    const combinedHistory = [...officialHistory];
+                    
+                    tempHistory.forEach(th => {
+                      const alreadyExists = combinedHistory.some(oh => oh.belt === th.belt && oh.date === th.date);
+                      if (!alreadyExists) {
+                        combinedHistory.push(th);
+                        historyChanged = true;
+                      }
+                    });
+                    if (historyChanged) {
+                      mergedFields.beltHistory = combinedHistory;
+                      officialDoc.beltHistory = combinedHistory;
+                      needsUpdate = true;
+                    }
+                  } else if (officialVal !== tempVal) {
+                    mergedFields[field] = tempVal;
+                    officialDoc[field] = tempVal;
+                    needsUpdate = true;
+                  }
+                }
+              });
+            });
+            
+            if (needsUpdate) {
+              // Update official doc in Firestore
+              (async () => {
+                try {
+                  await updateDoc(doc(db, 'users', officialDoc.id), mergedFields);
+                  console.log(`[Autoclean] Merged fields into official doc ${officialDoc.id}:`, mergedFields);
+                } catch (updateErr) {
+                  console.warn(`[Autoclean] Failed to merge fields into official doc ${officialDoc.id}:`, updateErr);
+                }
+              })();
             }
+
+            cleanedList.push(officialDoc);
+            
+            // Collect the temporary random documents for deletion
+            tempDocs.forEach(td => {
+              duplicatesToDelete.push(td.id);
+            });
           } else {
             cleanedList.push(docs[0]);
           }
@@ -540,7 +598,7 @@ const AdminDashboard = () => {
       alert('Profile updated successfully!');
     } catch (error) {
       console.error(error);
-      alert('Failed to update profile.');
+      alert('Failed to update profile: ' + error.message);
     }
   };
 
@@ -579,7 +637,7 @@ const AdminDashboard = () => {
       alert('Dojo Admin profile updated successfully!');
     } catch (e) {
       console.error(e);
-      alert('Failed to update admin profile.');
+      alert('Failed to update admin profile: ' + e.message);
     } finally {
       setAdminSaving(false);
     }

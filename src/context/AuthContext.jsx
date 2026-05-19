@@ -88,6 +88,7 @@ export const AuthProvider = ({ children }) => {
           await setDoc(doc(db, 'users', u.uid), {
             ...existingData,
             uid: u.uid,
+            id: u.uid,
             email: existingData.email ? existingData.email.trim().toLowerCase() : u.email.trim().toLowerCase(),
             profilePhotoUrl: existingData.profilePhotoUrl || u.photoURL || '',
             isOnboarded: existingData.isOnboarded !== undefined ? existingData.isOnboarded : true,
