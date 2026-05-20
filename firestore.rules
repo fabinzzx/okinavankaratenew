@@ -1,0 +1,86 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper Functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      let path = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(path) ? get(path).data : null;
+    }
+
+    function isSuperAdmin() {
+      let data = getUserData();
+      return isSignedIn() && data != null && data.role == 'super_admin';
+    }
+
+    function isDojoAdmin() {
+      let data = getUserData();
+      return isSignedIn() && data != null && (data.role == 'dojo_admin' || data.role == 'super_admin');
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if isSignedIn() && (
+        request.auth.uid == userId || 
+        resource.data.email == request.auth.token.email || 
+        isDojoAdmin()
+      );
+      allow write: if isSignedIn() && (
+        request.auth.uid == userId || 
+        isDojoAdmin()
+      );
+    }
+
+    // Attendance Collection
+    match /attendance/{attId} {
+      allow read: if isSignedIn() && (
+        request.auth.uid == resource.data.uid || 
+        isDojoAdmin()
+      );
+      allow write: if isDojoAdmin();
+    }
+
+    // Exams Collection
+    match /exams/{examId} {
+      allow read: if isSignedIn() && (
+        request.auth.uid == resource.data.uid || 
+        isDojoAdmin()
+      );
+      allow write: if isDojoAdmin();
+    }
+
+    // Fees Collection
+    match /fees/{feeId} {
+      allow read: if isSignedIn() && (
+        request.auth.uid == resource.data.uid || 
+        isDojoAdmin()
+      );
+      allow write: if isDojoAdmin();
+    }
+
+    // Tournaments Collection
+    match /tournaments/{tourId} {
+      allow read: if isSignedIn() && (
+        request.auth.uid == resource.data.uid || 
+        isDojoAdmin()
+      );
+      allow write: if isDojoAdmin();
+    }
+
+    // Notifications (Announcements)
+    match /notifications/{notifId} {
+      allow read: if isSignedIn();
+      allow write: if isDojoAdmin();
+    }
+
+    // Enquiries (Contact/Academy message enquiries)
+    match /enquiries/{enquiryId} {
+      allow create: if true;
+      allow read, update, delete: if isDojoAdmin();
+    }
+  }
+}

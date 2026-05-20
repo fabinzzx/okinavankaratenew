@@ -196,6 +196,12 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isDojoAdmin();
     }
+
+    // Enquiries (Contact/Academy message enquiries)
+    match /enquiries/{enquiryId} {
+      allow create: if true;
+      allow read, update, delete: if isDojoAdmin();
+    }
   }
 }
 ```

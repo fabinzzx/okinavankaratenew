@@ -39,6 +39,7 @@ const AppContent = () => {
             <Route path="/login" element={<Login />} />
             <Route path="/joinus" element={<JoinUs />} />
             <Route path="/blackbelt" element={<BlackBelts />} />
+            <Route path="/blackbelt.html" element={<BlackBelts />} />
 
             {/* Protected Student Routes */}
             <Route 

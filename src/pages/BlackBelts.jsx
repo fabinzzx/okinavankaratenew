@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ShieldAlert, Award, Star, SearchCheck, AlertTriangle } from 'lucide-react';
+import { Search, ShieldAlert, Award, Star, SearchCheck, AlertTriangle, CheckCircle, ArrowLeft } from 'lucide-react';
 
 const BlackBelts = () => {
   const [students, setStudents] = useState([]);
@@ -8,6 +9,8 @@ const BlackBelts = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredStudents, setFilteredStudents] = useState([]);
   const [error, setError] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const regFromURL = searchParams.get('reg');
 
   // Helper to extract integer from Dan level (e.g. "2nd Dan" -> 2)
   const getDanLevelNumber = (dan) => {
@@ -38,10 +41,8 @@ const BlackBelts = () => {
           // Sort Dan Level newest/highest first
           const sorted = data.result.sort((a, b) => getDanLevelNumber(b.danLevel) - getDanLevelNumber(a.danLevel));
           setStudents(sorted);
-          setFilteredStudents(sorted);
         } else {
           setStudents([]);
-          setFilteredStudents([]);
         }
       } catch (error) {
         console.error("Failed to fetch blackbelts from Sanity:", error);
@@ -54,7 +55,22 @@ const BlackBelts = () => {
     fetchBlackBelts();
   }, []);
 
+  useEffect(() => {
+    if (regFromURL) {
+      const q = regFromURL.trim().toLowerCase();
+      const filtered = students.filter(s => 
+        s.registerNumber && s.registerNumber.trim().toLowerCase() === q
+      );
+      setFilteredStudents(filtered);
+    } else {
+      setFilteredStudents(students);
+    }
+  }, [students, regFromURL]);
+
   const handleSearch = () => {
+    if (regFromURL) {
+      setSearchParams({});
+    }
     const q = searchTerm.trim().toLowerCase();
     const filtered = students.filter(s => 
       s.name.toLowerCase().includes(q) || 
@@ -62,6 +78,11 @@ const BlackBelts = () => {
       (s.danLevel && String(s.danLevel).toLowerCase().includes(q))
     );
     setFilteredStudents(filtered);
+  };
+
+  const handleClearQR = () => {
+    setSearchParams({});
+    setSearchTerm('');
   };
 
   return (
@@ -79,11 +100,52 @@ const BlackBelts = () => {
               Certified Roster
             </span>
             <h1 className="text-4xl sm:text-6xl font-extrabold uppercase tracking-tight dark:text-white text-brand-dark">
-              Our <span className="text-brand-red">Blackbelts</span>
+              Our {regFromURL ? <span className="text-emerald-500 dark:text-emerald-400">Verified</span> : <span className="text-brand-red">Blackbelts</span>}
             </h1>
             <div className="h-1 w-24 bg-brand-red mx-auto mt-4" />
           </motion.div>
         </div>
+
+        {/* Verification Status Banners */}
+        {regFromURL && !loading && !error && (
+          filteredStudents.length > 0 ? (
+            <div className="flex flex-col items-center mb-10">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 px-5 py-2.5 rounded-full font-bold uppercase tracking-wider text-xs shadow-sm mb-4"
+              >
+                <CheckCircle size={16} className="text-emerald-500 animate-pulse" />
+                <span>Verified Academy Certificate</span>
+              </motion.div>
+              <button
+                onClick={handleClearQR}
+                className="flex items-center space-x-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-brand-red dark:hover:text-brand-red font-bold uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                <ArrowLeft size={14} />
+                <span>View Full Blackbelt Roster</span>
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center mb-10">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex items-center space-x-2 bg-brand-red/10 border border-brand-red/30 text-brand-red px-5 py-2.5 rounded-full font-bold uppercase tracking-wider text-xs shadow-sm mb-4"
+              >
+                <AlertTriangle size={16} className="animate-bounce" />
+                <span>Invalid or Unknown Certificate</span>
+              </motion.div>
+              <button
+                onClick={handleClearQR}
+                className="flex items-center space-x-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-brand-red dark:hover:text-brand-red font-bold uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                <ArrowLeft size={14} />
+                <span>View Full Blackbelt Roster</span>
+              </button>
+            </div>
+          )
+        )}
 
         {/* Search */}
         <div className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-2xl p-6 mb-12 shadow-xl flex flex-col sm:flex-row gap-4 items-center justify-between">
@@ -133,7 +195,11 @@ const BlackBelts = () => {
           <AnimatePresence mode="wait">
             <motion.div 
               layout
-              className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-8 justify-center"
+              className={`grid gap-4 sm:gap-8 justify-center ${
+                filteredStudents.length === 1 
+                  ? 'grid-cols-1 max-w-sm mx-auto' 
+                  : 'grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4'
+              }`}
             >
               {filteredStudents.map((student, index) => (
                 <motion.div
@@ -143,7 +209,11 @@ const BlackBelts = () => {
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.3 }}
                   key={index}
-                  className="border dark:border-white/10 border-brand-dark/10 dark:bg-white/5 bg-white rounded-2xl overflow-hidden shadow-xl hover:border-brand-red/30 transition-all flex flex-col h-full"
+                  className={`border overflow-hidden rounded-2xl shadow-xl transition-all flex flex-col h-full ${
+                    regFromURL 
+                      ? 'border-emerald-500 dark:border-emerald-500/50 bg-emerald-500/5 dark:bg-emerald-500/5 shadow-emerald-500/10 scale-105' 
+                      : 'border-brand-dark/10 dark:border-white/10 dark:bg-white/5 bg-white hover:border-brand-red/30'
+                  }`}
                 >
                   <div className="h-40 sm:h-56 bg-brand-dark/5 dark:bg-white/10 relative overflow-hidden flex items-center justify-center">
                     <img 
@@ -155,7 +225,9 @@ const BlackBelts = () => {
                         e.target.src = '/images/LOGO.png';
                       }}
                     />
-                    <div className="absolute top-2 right-2 sm:top-3 sm:right-3 bg-brand-gold/90 text-brand-dark p-1 sm:p-1.5 rounded-full shadow-md">
+                    <div className={`absolute top-2 right-2 sm:top-3 sm:right-3 p-1 sm:p-1.5 rounded-full shadow-md ${
+                      regFromURL ? 'bg-emerald-500 text-white' : 'bg-brand-gold/90 text-brand-dark'
+                    }`}>
                       <Award className="w-3.5 h-3.5 sm:w-4.5 sm:h-4.5" />
                     </div>
                   </div>
