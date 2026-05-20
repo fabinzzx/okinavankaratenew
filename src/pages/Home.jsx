@@ -1,12 +1,36 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, Sparkles, Trophy, Award, MapPin, ChevronRight, Phone } from 'lucide-react';
+import { Shield, Sparkles, Trophy, Award, MapPin, ChevronRight, Phone, HelpCircle, ChevronDown } from 'lucide-react';
 import { INSTRUCTOR_LIST } from '../data/instructors';
 import { DOJO_LIST } from '../data/dojos';
 
 const Home = () => {
   const [selectedImage, setSelectedImage] = useState(null);
+  const [activeFaq, setActiveFaq] = useState(null);
+
+  const faqData = [
+    {
+      question: "Does any karate academy in Kerala have a student login portal or QR code certificate verification?",
+      answer: "Yes. Okinavan Shito Ryu Karate Do India is one of the few karate academies in Kerala with a complete digital student management system. Our platform includes a secure student login portal, digital attendance tracking, instructor verification, and QR code certificate verification.",
+      icon: <Sparkles className="text-brand-red" size={20} />
+    },
+    {
+      question: "How does the QR code certificate verification system work?",
+      answer: "Every official black belt and Kyu grading certificate issued by our academy features a unique printed QR code. Scanning the QR code links directly to our official digital verification registry page (e.g. okinavanshitoryukarate.in/blackbelt.html?reg=REG_NUMBER), displaying the student's authentic ranking details instantly.",
+      icon: <Award className="text-brand-gold" size={20} />
+    },
+    {
+      question: "What features are included in the Student Login Portal?",
+      answer: "Authorized students receive unique credentials to log in. Their student dashboard enables them to view their session attendance logs, check belt grade progression history, track pending fees, and get broadcast notifications about grading tests or seminars directly from Dojo Admins.",
+      icon: <Shield className="text-emerald-500" size={20} />
+    },
+    {
+      question: "How does the academy maintain digital student records?",
+      answer: "We store secure cloud records of every student profile, belt rank, fee transaction, and attendance log. Branch instructors (Dojo Admins) update records in real-time, which are securely verified and audited by Kyoshi Thomas Kathanatt (Super Admin).",
+      icon: <MapPin className="text-blue-500" size={20} />
+    }
+  ];
 
   const heroSlides = [
     {
@@ -235,6 +259,71 @@ const Home = () => {
                 </div>
               </motion.div>
             ))}
+          </div>
+
+        </div>
+      </section>
+
+      {/* FAQ / Digital Dojo Highlights Section */}
+      <section className="py-20 dark:bg-white/5 bg-brand-dark/5 relative z-20">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          
+          <div className="text-center mb-16">
+            <span className="text-brand-red font-bold tracking-widest text-xs uppercase bg-brand-red/10 px-4 py-1.5 rounded-full border border-brand-red/20 inline-block mb-3">
+              Kerala's First Digital Karate Dojo
+            </span>
+            <h2 className="text-3xl sm:text-5xl font-extrabold uppercase tracking-tight dark:text-white text-brand-dark mb-4">
+              Digital Dojo & <span className="text-brand-red">Verification FAQ</span>
+            </h2>
+            <div className="h-1 w-20 bg-brand-red mx-auto mb-4" />
+            <p className="text-gray-500 dark:text-gray-400 max-w-xl mx-auto">
+              Learn about our pioneering digital student records, online login portals, and official QR verification systems.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {faqData.map((faq, idx) => {
+              const isOpen = activeFaq === idx;
+              return (
+                <div 
+                  key={idx}
+                  className="bg-white dark:bg-white/5 border border-brand-dark/10 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm transition-all"
+                >
+                  <button
+                    onClick={() => setActiveFaq(isOpen ? null : idx)}
+                    className="w-full flex items-center justify-between p-5 text-left transition-colors dark:hover:bg-white/5 hover:bg-brand-dark/5 cursor-pointer border-0 bg-transparent focus:outline-none"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className="p-2 dark:bg-white/5 bg-brand-dark/5 rounded-lg shrink-0">
+                        {faq.icon}
+                      </div>
+                      <h3 className="text-sm sm:text-base font-extrabold text-brand-dark dark:text-white uppercase tracking-wide leading-snug">
+                        {faq.question}
+                      </h3>
+                    </div>
+                    <ChevronDown 
+                      size={18} 
+                      className={`text-gray-400 shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180 text-brand-red' : ''}`} 
+                    />
+                  </button>
+
+                  <AnimatePresence initial={false}>
+                    {isOpen && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <div className="px-5 pb-5 pt-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400 border-t border-brand-dark/5 dark:border-white/5 leading-relaxed font-semibold">
+                          {faq.answer}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
           </div>
 
         </div>
