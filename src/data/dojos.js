@@ -29,7 +29,7 @@ export const DOJO_LIST = [
     instructor: "Sensei Josemon K K",
     phone: "9544382021",
     address: "Bhavas Building, Panayikulam",
-    mapUrl: "https://www.google.com/maps/embed?pb=!1m17!1m12!1m3!1d3927.951218267438!2d76.290582!3d10.103079!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMTDCsDA2JzExLjEiTiA3NsKwMTcnMjKuMSJF!5e0!3m2!1sen!2sin!4v1750916479679!5m2!1sen!2sin"
+    mapUrl: "https://www.google.com/maps/embed?pb=!4v1779292360343!6m8!1m7!1sh8lu8ykZUao_EmUbmFLIww!2m2!1d10.10318032535936!2d76.29067641111358!3f195.78358!4f0!5f0.7820865974627469"
   },
   {
     id: "pattam",
@@ -54,5 +54,13 @@ export const DOJO_LIST = [
     phone: "9539652248",
     address: "Kunnumpuram Dojo",
     mapUrl: "https://www.google.com/maps/embed?pb=!1m17!1m12!1m3!1d3926.544005394754!2d76.20673817503408!3d10.217635989899192!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMTDCsDEzJzAzLjUiTiA3NsKwMTInMzMuNSJF!5e0!3m2!1sen!2sin!4v1750917233750!5m2!1sen!2sin"
+  },
+  {
+    id: "vcshss_puthenvelikkara",
+    name: "VCSHSS Puthenvelikkara",
+    instructor: "Ashik Soman",
+    phone: "+91 8078 379 325",
+    address: "VCSHSS Puthenvelikkara",
+    mapUrl: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d4816.710214909757!2d76.24208037586527!3d10.180702389934167!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3b081ae63603f7a1%3A0x1adbb99f7e00b236!2sVCSHSS%20PUTHENVELIKARA!5e1!3m2!1sen!2sin!4v1779291990262!5m2!1sen!2sin"
   }
 ];

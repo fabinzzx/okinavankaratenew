@@ -1465,11 +1465,9 @@ const AdminDashboard = () => {
                   >
                     <option value="" disabled>Select target branch</option>
                     <option value="all">Broadcast to All Dojos</option>
-                    <option value="sunil_hall">Sunil Hall Only</option>
-                    <option value="puliyamthuruthu">Puliyamthuruthu Only</option>
-                    <option value="pothanicad">Pothanicad Only</option>
-                    <option value="panayikulam">Bhavas Building Only</option>
-                    <option value="pattam">Pattam Dojo Only</option>
+                    {DOJO_LIST.map((dojo) => (
+                      <option key={dojo.id} value={dojo.id}>{dojo.name} Only</option>
+                    ))}
                   </select>
                 </div>
               ) : null}
