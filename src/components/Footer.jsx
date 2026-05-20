@@ -74,10 +74,6 @@ const Footer = () => {
               <span>+91 9947001779</span>
             </div>
             <div className="flex items-start space-x-3 text-sm">
-              <Mail size={18} className="text-brand-red flex-shrink-0 mt-0.5" />
-              <span>info@okinavankarateindia.com</span>
-            </div>
-            <div className="flex items-start space-x-3 text-sm">
               <MapPin size={18} className="text-brand-red flex-shrink-0 mt-0.5" />
               <span>Sunil Hall, Puthenvelikkara, Kerala, India</span>
             </div>

@@ -83,14 +83,6 @@ const Contact = () => {
                 </div>
 
                 <div className="flex items-start space-x-3">
-                  <Mail className="text-brand-red shrink-0 mt-1" size={18} />
-                  <div>
-                    <h4 className="dark:text-white text-brand-dark font-bold text-sm uppercase tracking-wide">Write to Us</h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">info@okinavankarateindia.com</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-3">
                   <MapPin className="text-brand-red shrink-0 mt-1" size={18} />
                   <div>
                     <h4 className="dark:text-white text-brand-dark font-bold text-sm uppercase tracking-wide">Headquarters</h4>
