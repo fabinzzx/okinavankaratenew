@@ -227,21 +227,21 @@ const Home = () => {
                     Sensei Branch
                   </span>
                   <h3 className="dark:text-white text-brand-dark font-extrabold text-xl mb-4">{dojo.name}</h3>
-                  <div className="space-y-2 text-sm text-gray-500 dark:text-gray-400 mb-6">
-                    <p className="flex items-center space-x-2">
-                      <strong className="dark:text-white text-brand-dark">Instructor:</strong> 
-                      <span>{dojo.instructor}</span>
+                  <div className="space-y-3 text-sm text-gray-500 dark:text-gray-400 mb-6 font-semibold">
+                    <p className="leading-relaxed">
+                      <strong className="dark:text-white text-brand-dark mr-1.5">Instructor:</strong>
+                      <span className="text-gray-600 dark:text-gray-300">{dojo.instructor}</span>
                     </p>
-                    <p className="flex items-center space-x-2">
-                      <strong className="dark:text-white text-brand-dark">Phone:</strong> 
-                      <a href={`tel:${dojo.phone}`} className="hover:text-brand-red transition-colors flex items-center space-x-1">
-                        <Phone size={12} className="text-brand-red" />
+                    <p className="leading-relaxed">
+                      <strong className="dark:text-white text-brand-dark mr-1.5">Phone:</strong>
+                      <a href={`tel:${dojo.phone}`} className="hover:text-brand-red transition-colors text-gray-600 dark:text-gray-300 inline-flex items-center gap-1 align-middle">
+                        <Phone size={12} className="text-brand-red shrink-0" />
                         <span>{dojo.phone}</span>
                       </a>
                     </p>
-                    <p className="flex items-start space-x-2">
-                      <strong className="dark:text-white text-brand-dark flex-shrink-0">Address:</strong> 
-                      <span className="leading-relaxed">{dojo.address}</span>
+                    <p className="leading-relaxed">
+                      <strong className="dark:text-white text-brand-dark mr-1.5">Address:</strong>
+                      <span className="text-gray-600 dark:text-gray-300">{dojo.address}</span>
                     </p>
                   </div>
                 </div>
