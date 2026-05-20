@@ -17,7 +17,7 @@ const Home = () => {
     },
     {
       question: "How does the QR code certificate verification system work?",
-      answer: "Every official black belt and Kyu grading certificate issued by our academy features a unique printed QR code. Scanning the QR code links directly to our official digital verification registry page (e.g. okinavanshitoryukarate.in/blackbelt.html?reg=REG_NUMBER), displaying the student's authentic ranking details instantly.",
+      answer: "Every official black belt (Dan rank) certificate issued by our academy features a unique printed QR code. Scanning the QR code links directly to our official digital verification registry page (e.g. okinavanshitoryukarate.in/blackbelt.html?reg=REG_NUMBER), displaying the student's authentic ranking details instantly. Note that Kyu grading (color belt) certificates are verified internally and do not feature public QR code verification.",
       icon: <Award className="text-brand-gold" size={20} />
     },
     {
