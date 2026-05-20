@@ -1317,8 +1317,8 @@ const AdminDashboard = () => {
                       <thead className="bg-brand-dark/80 border-b border-white/10 text-gray-400 text-xs uppercase tracking-wider font-bold">
                         <tr>
                           <th className="p-4">Student Name</th>
-                          <th className="p-4">Email</th>
-                          <th className="p-4">Belt Rank</th>
+                          <th className="p-4 hidden sm:table-cell">Email</th>
+                          <th className="p-4 hidden sm:table-cell">Belt Rank</th>
                           <th className="p-4 text-center">Status</th>
                         </tr>
                       </thead>
@@ -1329,8 +1329,8 @@ const AdminDashboard = () => {
                           return (
                             <tr key={studentId} className="hover:bg-white/5">
                               <td className="p-4 text-white font-extrabold">{student.fullName}</td>
-                              <td className="p-4 text-gray-500 font-semibold">{student.email}</td>
-                              <td className="p-4 text-brand-gold uppercase">{student.beltGrade}</td>
+                              <td className="p-4 text-gray-500 font-semibold hidden sm:table-cell">{student.email}</td>
+                              <td className="p-4 text-brand-gold uppercase hidden sm:table-cell">{student.beltGrade}</td>
                               <td className="p-4">
                                 <div className="flex justify-center">
                                   <button
