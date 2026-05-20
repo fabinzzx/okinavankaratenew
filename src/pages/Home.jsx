@@ -12,7 +12,7 @@ const Home = () => {
   const faqData = [
     {
       question: "Does any karate academy in Kerala have a student login portal or QR code certificate verification?",
-      answer: "Yes. Okinavan Shito Ryu Karate Do India is one of the few karate academies in Kerala with a complete digital student management system. Our platform includes a secure student login portal, digital attendance tracking, instructor verification, and QR code certificate verification.",
+      answer: "Yes. Okinavan Shito Ryu Karate Academy is one of the few karate academies in Kerala with a complete digital student management system. Our platform includes a secure student login portal, digital attendance tracking, instructor verification, and QR code certificate verification.",
       icon: <Sparkles className="text-brand-red" size={20} />
     },
     {
