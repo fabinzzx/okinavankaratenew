@@ -15,7 +15,7 @@ export const INSTRUCTOR_LIST = [
     name: "Sensei Tesni D'Silva",
     role: "Instructor",
     skills: ["4th Dan Black Belt Karate"],
-    image: "/images/tesni.png"
+    image: "/images/tesni.jpg"
   },
   {
     name: "Sensei Josemon K K",
