@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, BarChart2, Calendar, Award, CreditCard, Bell, UserCog, Home,
-  Settings, Search, Plus, Edit2, Trash2, Shield, Eye, Download, FileText, MessageSquare, Mail, LogOut
+  Settings, Search, Plus, Edit2, Trash2, Shield, Eye, Download, FileText, MessageSquare, Mail, LogOut,
+  FolderOpen, Upload, Loader2, Image as ImageIcon, RefreshCw
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell 
@@ -92,6 +93,182 @@ const AdminDashboard = () => {
   // Enquiries states
   const [enquiries, setEnquiries] = useState([]);
   const [loadingEnquiries, setLoadingEnquiries] = useState(false);
+
+  // Cloudinary Admin Wallet State
+  const [walletDocs, setWalletDocs] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+  const [replacingDoc, setReplacingDoc] = useState(null);
+  const uploadControllerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (uploadControllerRef.current) {
+        uploadControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  // Load Admin Wallet documents from Firestore
+  useEffect(() => {
+    if (activeView === 'wallet' && user) {
+      const fetchWalletDocs = async () => {
+        try {
+          const docsQuery = query(collection(db, 'documents'), where('parentUid', '==', user.uid));
+          const docsSnap = await getDocs(docsQuery);
+          setWalletDocs(docsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        } catch (err) {
+          console.error("Error fetching admin documents:", err);
+        }
+      };
+      fetchWalletDocs();
+    }
+  }, [activeView, user]);
+
+  const uploadFileToCloudinary = async (file) => {
+    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'dkijeoc9f';
+    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'okinavankarate';
+
+    if (!cloudName || !uploadPreset) {
+      throw new Error("Cloudinary cloud name or upload preset is not configured.");
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', uploadPreset);
+    formData.append('folder', `documents/admins/${user.uid}`);
+
+    const controller = new AbortController();
+    uploadControllerRef.current = controller;
+
+    const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/upload`, {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error?.message || "Failed to upload file to Cloudinary.");
+    }
+
+    const data = await response.json();
+    return {
+      url: data.secure_url,
+      publicId: data.public_id,
+      name: file.name,
+      type: file.name.split('.').pop().toLowerCase(),
+      size: (file.size / (1024 * 1024)).toFixed(2) + ' MB'
+    };
+  };
+
+  const handleDocUpload = async (file) => {
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError("File size exceeds 5MB limit.");
+      return;
+    }
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+    if (!allowedTypes.includes(file.type)) {
+      setUploadError("Unsupported file type. Please upload PDF, JPEG, JPG, or PNG.");
+      return;
+    }
+
+    setUploading(true);
+    setUploadError(null);
+
+    try {
+      const uploadedData = await uploadFileToCloudinary(file);
+      
+      const docId = doc(collection(db, 'documents')).id;
+      const metadata = {
+        ownerId: user.uid,
+        ownerEmail: user.email,
+        parentUid: user.uid,
+        name: uploadedData.name,
+        url: uploadedData.url,
+        publicId: uploadedData.publicId,
+        type: uploadedData.type,
+        size: uploadedData.size,
+        uploadedAt: new Date().toISOString()
+      };
+
+      await setDoc(doc(db, 'documents', docId), metadata);
+      setWalletDocs(prev => [...prev, { id: docId, ...metadata }]);
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        console.log("Upload cancelled");
+      } else {
+        setUploadError(err.message || "Failed to upload document.");
+      }
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDocReplace = async (file, oldDoc) => {
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError("File size exceeds 5MB limit.");
+      return;
+    }
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+    if (!allowedTypes.includes(file.type)) {
+      setUploadError("Unsupported file type. Please upload PDF, JPEG, JPG, or PNG.");
+      return;
+    }
+
+    setUploading(true);
+    setUploadError(null);
+
+    try {
+      const uploadedData = await uploadFileToCloudinary(file);
+      
+      const docRef = doc(db, 'documents', oldDoc.id);
+      const updateData = {
+        name: uploadedData.name,
+        url: uploadedData.url,
+        publicId: uploadedData.publicId,
+        type: uploadedData.type,
+        size: uploadedData.size,
+        uploadedAt: new Date().toISOString()
+      };
+
+      await updateDoc(docRef, updateData);
+      setWalletDocs(prev => prev.map(d => d.id === oldDoc.id ? { ...d, ...updateData } : d));
+      setReplacingDoc(null);
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        console.log("Upload cancelled");
+      } else {
+        setUploadError(err.message || "Failed to replace document.");
+      }
+    } finally {
+      setUploading(false);
+      setReplacingDoc(null);
+    }
+  };
+
+  const handleDocDelete = async (docId) => {
+    if (!window.confirm("Are you sure you want to delete this document?")) return;
+    try {
+      await deleteDoc(doc(db, 'documents', docId));
+      setWalletDocs(prev => prev.filter(d => d.id !== docId));
+    } catch (err) {
+      console.error("Failed to delete document metadata:", err);
+      alert("Failed to delete document. Please try again.");
+    }
+  };
+
+  const handleCancelUpload = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (uploadControllerRef.current) {
+      uploadControllerRef.current.abort();
+    }
+    setUploading(false);
+    setReplacingDoc(null);
+  };
 
   // Load enquiries
   useEffect(() => {
@@ -776,7 +953,8 @@ const AdminDashboard = () => {
               { id: 'attendance', label: 'Attendance', icon: <Calendar size={16} /> },
               { id: 'notifications', label: 'Dojo Broadcast', icon: <Bell size={16} /> },
               { id: 'enquiries', label: 'Enquiries', icon: <MessageSquare size={16} /> },
-              { id: 'logs', label: 'Activity Logs', icon: <FileText size={16} /> }
+              { id: 'logs', label: 'Activity Logs', icon: <FileText size={16} /> },
+              { id: 'wallet', label: 'My Wallet / Docs', icon: <FolderOpen size={16} /> }
             ].map((item) => (
               <button
                 key={item.id}
@@ -1589,6 +1767,153 @@ const AdminDashboard = () => {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* 5. WALLET VIEW */}
+        {activeView === 'wallet' && (
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-black uppercase text-white tracking-wide">
+                My <span className="text-brand-red">Documents Wallet</span>
+              </h1>
+              <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider font-semibold">
+                Store, manage, and download your administrative and personal documents.
+              </p>
+            </div>
+
+            {/* Upload Area */}
+            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 space-y-4">
+              <h2 className="text-sm font-bold uppercase text-white tracking-wide">Upload New Document</h2>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                Upload your files. Supported formats: <strong>PDF, JPEG, JPG, PNG</strong> (Max 5MB).
+              </p>
+
+              {uploadError && (
+                <div className="p-4 bg-brand-red/10 border border-brand-red/25 rounded-2xl text-brand-red text-xs font-bold flex items-center space-x-2">
+                  <Shield size={16} />
+                  <span>{uploadError}</span>
+                </div>
+              )}
+
+              {uploading ? (
+                <div className="flex flex-col items-center justify-center py-8 space-y-3 bg-brand-dark border border-white/5 rounded-2xl">
+                  <Loader2 className="animate-spin text-brand-red" size={32} />
+                  <p className="text-xs text-gray-300 font-bold uppercase tracking-wider">
+                    {replacingDoc ? "Replacing Document..." : "Uploading..."}
+                  </p>
+                  <button
+                    onClick={handleCancelUpload}
+                    className="px-4 py-1.5 bg-brand-red/10 border border-brand-red/25 hover:bg-brand-red/20 text-brand-red rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
+                  >
+                    Cancel Upload
+                  </button>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center py-10 border-2 border-dashed border-white/10 rounded-3xl cursor-pointer hover:border-brand-red/50 hover:bg-brand-red/5 transition-all text-center">
+                  <Upload className="text-brand-red mb-2" size={32} />
+                  <span className="text-xs text-gray-300 font-extrabold uppercase tracking-widest">
+                    Select File to Upload
+                  </span>
+                  <input
+                    type="file"
+                    accept=".pdf,image/png,image/jpeg,image/jpg"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleDocUpload(e.target.files[0]);
+                      }
+                    }}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </div>
+
+            {/* List Grid */}
+            <div className="space-y-4">
+              <h2 className="text-sm font-bold uppercase text-white tracking-wider flex items-center space-x-2">
+                <FolderOpen size={16} className="text-brand-red" />
+                <span>Stored Documents ({walletDocs.length})</span>
+              </h2>
+
+              {walletDocs.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {walletDocs.map((docItem) => {
+                    const isPDF = docItem.type === 'pdf';
+                    return (
+                      <div 
+                        key={docItem.id} 
+                        className="p-5 bg-white/5 border border-white/10 hover:border-brand-red/35 rounded-2xl flex items-center justify-between gap-4 group transition-all"
+                      >
+                        <div className="flex items-center space-x-4 overflow-hidden">
+                          <div className="p-3 bg-brand-dark/50 border border-white/5 rounded-xl shrink-0">
+                            {isPDF ? (
+                              <FileText className="text-brand-red" size={24} />
+                            ) : (
+                              <ImageIcon className="text-brand-gold" size={24} />
+                            )}
+                          </div>
+                          <div className="overflow-hidden">
+                            <h3 className="text-white font-extrabold text-sm truncate uppercase" title={docItem.name}>
+                              {docItem.name}
+                            </h3>
+                            <div className="flex items-center space-x-2 text-[10px] text-gray-400 font-bold uppercase mt-0.5">
+                              <span>{docItem.size}</span>
+                              <span>•</span>
+                              <span>{docItem.uploadedAt ? new Date(docItem.uploadedAt).toLocaleDateString() : 'N/A'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2 shrink-0">
+                          {/* Download Link */}
+                          <a
+                            href={docItem.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-all"
+                            title="View Document"
+                          >
+                            <Download size={16} />
+                          </a>
+
+                          {/* Replace File Trigger */}
+                          <label className="p-2 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white cursor-pointer transition-all" title="Replace Document">
+                            <RefreshCw size={16} />
+                            <input
+                              type="file"
+                              accept=".pdf,image/png,image/jpeg,image/jpg"
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                  setReplacingDoc(docItem);
+                                  handleDocReplace(e.target.files[0], docItem);
+                                }
+                              }}
+                              className="hidden"
+                            />
+                          </label>
+
+                          {/* Delete Button */}
+                          <button
+                            onClick={() => handleDocDelete(docItem.id)}
+                            className="p-2 hover:bg-brand-red/10 rounded-lg text-gray-400 hover:text-brand-red transition-all"
+                            title="Delete Document"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-12 text-center border border-dashed border-white/10 rounded-3xl text-gray-400 text-sm">
+                  <FolderOpen size={36} className="mx-auto mb-3 opacity-40 text-brand-red" />
+                  <p className="font-bold uppercase tracking-wider mb-1">No Documents Uploaded</p>
+                  <p className="text-xs">Your administrative wallet is empty. Upload files above to make them accessible.</p>
+                </div>
+              )}
             </div>
           </div>
         )}

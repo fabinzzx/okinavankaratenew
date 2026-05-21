@@ -82,5 +82,15 @@ service cloud.firestore {
       allow create: if true;
       allow read, update, delete: if isDojoAdmin();
     }
+
+    // Documents Metadata Collection
+    match /documents/{docId} {
+      allow read, update, delete: if isSignedIn() && (
+        request.auth.uid == resource.data.ownerId || 
+        request.auth.token.email == resource.data.ownerEmail ||
+        request.auth.uid == resource.data.parentUid
+      );
+      allow create: if isSignedIn();
+    }
   }
 }
