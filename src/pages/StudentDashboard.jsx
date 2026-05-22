@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { 
   User, Calendar, Trophy, Award, Bell, CreditCard, ChevronRight, 
   Download, Edit2, LogOut, CheckCircle, ShieldAlert, Award as MedalIcon, Info, Home as HomeIcon,
-  FolderOpen, Upload, Trash2, FileText, Image as ImageIcon, Loader2, RefreshCw
+  FolderOpen, Upload, Trash2, FileText, Image as ImageIcon, Loader2, RefreshCw, Sun, Moon
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
@@ -13,6 +13,25 @@ import { db } from '../firebase/config';
 const StudentDashboard = () => {
   const { user, profile, availableProfiles, selectProfile, switchProfile, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
+  
+  const [darkMode, setDarkMode] = useState(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      return savedTheme === 'dark';
+    }
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (darkMode) {
+      root.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      root.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [darkMode]);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
     mobileNumber: profile?.mobileNumber || '',
@@ -275,7 +294,7 @@ const StudentDashboard = () => {
 
   if (!profile && availableProfiles && availableProfiles.length > 1) {
     return (
-      <div className="min-h-screen text-white py-16 px-4 flex flex-col justify-center items-center dark:bg-brand-dark bg-brand-light">
+      <div className="min-h-screen text-brand-dark dark:text-white py-16 px-4 flex flex-col justify-center items-center dark:bg-brand-dark bg-brand-light transition-colors duration-300">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -342,7 +361,7 @@ const StudentDashboard = () => {
   const totalPresentCount = attendance.filter(a => a.status?.toLowerCase() === 'present').length;
 
   return (
-    <div className="min-h-screen text-white py-12 transition-colors duration-300 dark:bg-brand-dark bg-brand-light">
+    <div className="min-h-screen text-brand-dark dark:text-white py-12 transition-colors duration-300 dark:bg-brand-dark bg-brand-light">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Top Header Card */}
@@ -444,6 +463,18 @@ const StudentDashboard = () => {
                 <span>Switch Student</span>
               </button>
             )}
+
+            {/* Theme Switcher */}
+            <div className="flex items-center justify-between px-4 py-3 border-t border-brand-dark/10 dark:border-white/5 mt-4 pt-4">
+              <span className="text-xs font-extrabold uppercase tracking-widest text-gray-500 dark:text-gray-400">Theme</span>
+              <button
+                onClick={() => setDarkMode(!darkMode)}
+                className="p-2 rounded-xl hover:bg-brand-dark/5 dark:hover:bg-white/10 text-gray-500 dark:text-gray-300 hover:text-brand-dark dark:hover:text-white transition-colors cursor-pointer"
+                aria-label="Toggle Theme"
+              >
+                {darkMode ? <Sun size={18} className="text-yellow-400" /> : <Moon size={18} />}
+              </button>
+            </div>
 
             <button
               onClick={logout}

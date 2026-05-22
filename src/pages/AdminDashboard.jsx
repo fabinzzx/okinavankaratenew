@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Users, BarChart2, Calendar, Award, CreditCard, Bell, UserCog, Home,
   Settings, Search, Plus, Edit2, Trash2, Shield, Eye, Download, FileText, MessageSquare, Mail, LogOut,
-  FolderOpen, Upload, Loader2, Image as ImageIcon, RefreshCw
+  FolderOpen, Upload, Loader2, Image as ImageIcon, RefreshCw, Sun, Moon
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell 
@@ -42,6 +42,25 @@ const AdminDashboard = () => {
   const { user, profile, role, logout } = useAuth();
   const navigate = useNavigate();
   const [activeView, setActiveView] = useState('overview');
+
+  const [darkMode, setDarkMode] = useState(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      return savedTheme === 'dark';
+    }
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (darkMode) {
+      root.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      root.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [darkMode]);
   
   // States
   const [students, setStudents] = useState([]);
@@ -1075,7 +1094,7 @@ const AdminDashboard = () => {
   });
 
   const beltColors = {
-    'White': '#FFFFFF',
+    'White': darkMode ? '#FFFFFF' : '#D1D5DB',
     'Yellow': '#FBBF24',
     'Orange': '#F97316',
     'Green': '#10B981',
@@ -1084,7 +1103,7 @@ const AdminDashboard = () => {
     'Brown Junior': '#B45309',
     'Brown Senior': '#78350F',
     'Brown Super Senior': '#451A03',
-    'Black': '#111827'
+    'Black': darkMode ? '#111827' : '#1F2937'
   };
 
   const beltPieData = Object.keys(beltCounts).map(belt => ({
@@ -1094,15 +1113,15 @@ const AdminDashboard = () => {
   }));
 
   return (
-    <div className="bg-brand-dark min-h-screen text-white flex flex-col lg:flex-row">
+    <div className="dark:bg-brand-dark bg-brand-light min-h-screen dark:text-white text-brand-dark flex flex-col lg:flex-row transition-colors duration-300">
       
       {/* Sidebar Dashboard Navigation */}
-      <div className="w-full lg:w-64 bg-white/5 border-r border-white/10 p-6 flex flex-col justify-between shrink-0 space-y-6">
+      <div className="w-full lg:w-64 dark:bg-white/5 bg-white border-r border-brand-dark/10 dark:border-white/10 p-6 flex flex-col justify-between shrink-0 space-y-6 text-brand-dark dark:text-white transition-colors duration-300">
         <div>
           <div className="flex items-center space-x-3 mb-8">
             <img src="/images/LOGO.png" alt="Dojo Logo" className="h-10 w-10 object-contain" />
             <div>
-              <h2 className="text-white font-extrabold text-sm uppercase tracking-wider">Karate Admin</h2>
+              <h2 className="dark:text-white text-brand-dark font-extrabold text-sm uppercase tracking-wider">Karate Admin</h2>
               <span className="text-[10px] text-brand-gold uppercase tracking-widest font-black block">
                 {role === 'super_admin' ? 'SUPER ADMIN' : 'DOJO ADMIN'}
               </span>
@@ -1123,10 +1142,10 @@ const AdminDashboard = () => {
               <button
                 key={item.id}
                 onClick={() => setActiveView(item.id)}
-                className={`flex items-center space-x-3 w-full px-4 py-3 rounded-xl text-xs font-extrabold uppercase tracking-widest transition-all ${
+                className={`flex items-center space-x-3 w-full px-4 py-3 rounded-xl text-xs font-extrabold uppercase tracking-widest transition-all cursor-pointer ${
                   activeView === item.id 
                     ? 'bg-brand-red text-white shadow-lg shadow-brand-red/10' 
-                    : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                    : 'text-gray-500 dark:text-gray-400 hover:bg-brand-dark/5 dark:hover:bg-white/5 hover:text-brand-dark dark:hover:text-white'
                 }`}
               >
                 {item.icon}
@@ -1136,17 +1155,29 @@ const AdminDashboard = () => {
           </nav>
         </div>
 
-        <div className="space-y-2 border-t border-white/5 pt-4">
+        <div className="space-y-2 border-t border-brand-dark/10 dark:border-white/5 pt-4">
+          {/* Theme Switcher */}
+          <div className="flex items-center justify-between px-4 py-2.5">
+            <span className="text-xs font-extrabold uppercase tracking-widest text-gray-500 dark:text-gray-400">Theme</span>
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className="p-2 rounded-xl hover:bg-brand-dark/5 dark:hover:bg-white/10 text-gray-500 dark:text-gray-300 hover:text-brand-dark dark:hover:text-white transition-colors cursor-pointer"
+              aria-label="Toggle Theme"
+            >
+              {darkMode ? <Sun size={16} className="text-yellow-400" /> : <Moon size={16} />}
+            </button>
+          </div>
+
           <button
             onClick={() => navigate('/')}
-            className="flex items-center space-x-3 w-full px-4 py-3 rounded-xl text-xs font-extrabold uppercase tracking-widest transition-all text-gray-400 hover:bg-white/5 hover:text-white"
+            className="flex items-center space-x-3 w-full px-4 py-3 rounded-xl text-xs font-extrabold uppercase tracking-widest transition-all text-gray-500 dark:text-gray-400 hover:bg-brand-dark/5 dark:hover:bg-white/5 hover:text-brand-dark dark:hover:text-white cursor-pointer"
           >
             <Home size={16} />
             <span>Home Page</span>
           </button>
           <button
             onClick={async () => { await logout(); navigate('/login'); }}
-            className="flex items-center space-x-3 w-full px-4 py-3 rounded-xl text-xs font-extrabold uppercase tracking-widest transition-all text-brand-red hover:bg-brand-red/10 hover:text-red-400"
+            className="flex items-center space-x-3 w-full px-4 py-3 rounded-xl text-xs font-extrabold uppercase tracking-widest transition-all text-brand-red hover:bg-brand-red/10 hover:text-red-400 cursor-pointer"
           >
             <LogOut size={16} />
             <span>Logout</span>
@@ -1164,7 +1195,7 @@ const AdminDashboard = () => {
         {activeView === 'overview' && (
           <div className="space-y-8">
             <div className="flex justify-between items-center">
-              <h1 className="text-2xl sm:text-3xl font-black uppercase text-white tracking-wide">
+              <h1 className="text-2xl sm:text-3xl font-black uppercase dark:text-white text-brand-dark tracking-wide">
                 Academy <span className="text-brand-red">Analytics</span>
               </h1>
             </div>
@@ -1174,15 +1205,15 @@ const AdminDashboard = () => {
               {[
                 { label: 'Active Members', value: activeMembersCount.toString(), change: 'Registered students', icon: <Users className="text-brand-red" /> },
                 { label: 'Avg Attendance', value: `${averageAttendancePercent}%`, change: 'Based on logs', icon: <Calendar className="text-brand-gold" /> },
-                { label: 'Black Belts', value: blackBeltsCount.toString(), change: 'Dan grades', icon: <Award className="text-white" /> },
+                { label: 'Black Belts', value: blackBeltsCount.toString(), change: 'Dan grades', icon: <Award className="dark:text-white text-brand-dark" /> },
                 { label: 'Monthly Income', value: formattedIncome, change: `${paidStudentsCount} active paid`, icon: <CreditCard className="text-brand-red" /> }
               ].map((m, idx) => (
-                <div key={idx} className="bg-white/5 border border-white/10 p-5 rounded-2xl space-y-2">
+                <div key={idx} className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 p-5 rounded-2xl space-y-2 shadow-md">
                   <div className="flex justify-between items-center">
                     <span className="text-[10px] text-gray-400 uppercase tracking-widest font-extrabold">{m.label}</span>
                     {m.icon}
                   </div>
-                  <h3 className="text-2xl font-black text-white">{m.value}</h3>
+                  <h3 className="text-2xl font-black dark:text-white text-brand-dark">{m.value}</h3>
                   <span className="text-[10px] text-emerald-400 font-bold block">{m.change}</span>
                 </div>
               ))}
@@ -1192,15 +1223,15 @@ const AdminDashboard = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               
               {/* Enrollment & Attendance Bar Chart */}
-              <div className="lg:col-span-2 bg-white/5 border border-white/10 p-6 rounded-3xl space-y-4 shadow-xl">
-                <h3 className="text-white font-extrabold text-sm uppercase tracking-wider">Branch-wise Student Enrollment</h3>
+              <div className="lg:col-span-2 dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 p-6 rounded-3xl space-y-4 shadow-xl">
+                <h3 className="dark:text-white text-brand-dark font-extrabold text-sm uppercase tracking-wider">Branch-wise Student Enrollment</h3>
                 <div className="h-72 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#222" />
+                      <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#222" : "#e5e7eb"} />
                       <XAxis dataKey="name" stroke="#666" fontSize={10} tickLine={false} />
                       <YAxis stroke="#666" fontSize={10} tickLine={false} />
-                      <Tooltip contentStyle={{ backgroundColor: '#0A0A0A', border: '1px solid #333', color: '#FFF' }} />
+                      <Tooltip contentStyle={{ backgroundColor: darkMode ? '#0A0A0A' : '#FFF', border: darkMode ? '1px solid #333' : '1px solid #e5e7eb', color: darkMode ? '#FFF' : '#0A0A0A' }} />
                       <Bar dataKey="Students" fill="#DC2626" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -1208,8 +1239,8 @@ const AdminDashboard = () => {
               </div>
 
               {/* Belt Grade Pie Chart distribution */}
-              <div className="bg-white/5 border border-white/10 p-6 rounded-3xl space-y-4 shadow-xl flex flex-col justify-between">
-                <h3 className="text-white font-extrabold text-sm uppercase tracking-wider">Belt Grade Distribution</h3>
+              <div className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 p-6 rounded-3xl space-y-4 shadow-xl flex flex-col justify-between">
+                <h3 className="dark:text-white text-brand-dark font-extrabold text-sm uppercase tracking-wider">Belt Grade Distribution</h3>
                 <div className="h-52 w-full relative flex items-center justify-center">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -1229,7 +1260,7 @@ const AdminDashboard = () => {
                   {/* Legend overlay */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">Total</span>
-                    <span className="text-2xl font-black text-white">{activeMembersCount}</span>
+                    <span className="text-2xl font-black dark:text-white text-brand-dark">{activeMembersCount}</span>
                   </div>
                 </div>
 
@@ -1253,7 +1284,7 @@ const AdminDashboard = () => {
           <div className="space-y-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h1 className="text-2xl sm:text-3xl font-black uppercase text-white tracking-wide">
+                <h1 className="text-2xl sm:text-3xl font-black uppercase dark:text-white text-brand-dark tracking-wide">
                   Student <span className="text-brand-red">Directory</span>
                 </h1>
                 <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider font-semibold">
@@ -1284,7 +1315,7 @@ const AdminDashboard = () => {
             </div>
 
             {/* Filters Bar */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-center justify-between shadow-lg">
+            <div className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-center justify-between shadow-md">
               <div className="relative w-full md:w-80">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
                 <input
@@ -1292,7 +1323,7 @@ const AdminDashboard = () => {
                   placeholder="Search student or email..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-brand-dark/50 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs focus:outline-none focus:border-brand-red/50 text-white placeholder-gray-500"
+                  className="w-full bg-white dark:bg-brand-dark/50 border border-brand-dark/15 dark:border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs focus:outline-none focus:border-brand-red/50 text-brand-dark dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                 />
               </div>
 
@@ -1300,7 +1331,7 @@ const AdminDashboard = () => {
                 <select
                   value={selectedDojoFilter}
                   onChange={(e) => setSelectedDojoFilter(e.target.value)}
-                  className="bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-brand-red/50 text-gray-300 w-full md:w-auto"
+                  className="bg-white dark:bg-brand-dark/50 border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-brand-red/50 text-brand-dark dark:text-gray-300 w-full md:w-auto"
                 >
                   <option value="">All branches</option>
                   {DOJO_LIST.map(dojo => (
@@ -1314,7 +1345,7 @@ const AdminDashboard = () => {
                 
                 if (adminDojos.length <= 1) {
                   return (
-                    <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-gray-300">
+                    <div className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs text-brand-dark dark:text-gray-300">
                       Branch: <span className="font-extrabold uppercase">{adminDojos[0]?.name || 'Pattam Dojo'}</span>
                     </div>
                   );
@@ -1324,7 +1355,7 @@ const AdminDashboard = () => {
                   <select
                     value={selectedDojoFilter}
                     onChange={(e) => setSelectedDojoFilter(e.target.value)}
-                    className="bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-brand-red/50 text-gray-300 w-full md:w-auto"
+                    className="bg-white dark:bg-brand-dark/50 border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-brand-red/50 text-brand-dark dark:text-gray-300 w-full md:w-auto"
                   >
                     <option value="">All My Branches</option>
                     {adminDojos.map(dojo => (
@@ -1336,22 +1367,22 @@ const AdminDashboard = () => {
             </div>
 
             {/* Students Directory — Card on mobile, Table on md+ */}
-            <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden shadow-xl">
+            <div className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-3xl overflow-hidden shadow-xl">
 
               {/* MOBILE: Card List */}
-              <div className="block md:hidden divide-y divide-white/5">
+              <div className="block md:hidden divide-y dark:divide-white/5 divide-brand-dark/10">
                 {filteredStudents.map((student) => (
                   <div key={student.id || student.uid} className="p-4 space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className="text-white font-extrabold text-sm">{student.fullName}</p>
+                        <p className="text-brand-dark dark:text-white font-extrabold text-sm">{student.fullName}</p>
                         <p className="text-[10px] text-gray-500">{student.email}</p>
                         <p className="text-xs text-gray-400 mt-0.5">{student.mobileNumber}</p>
                       </div>
                       <div className="flex items-center space-x-1 shrink-0">
                         <button
                           onClick={() => handleOpenEdit(student)}
-                          className="p-2 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-brand-gold rounded-xl transition-all"
+                          className="p-2 dark:bg-white/5 bg-brand-dark/5 hover:bg-brand-dark/10 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-brand-gold rounded-xl transition-all"
                           title="Edit"
                         >
                           <Edit2 size={14} />
@@ -1368,7 +1399,7 @@ const AdminDashboard = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-3 flex-wrap">
-                      <span className="text-[10px] uppercase tracking-wider text-gray-500 bg-white/5 px-2 py-1 rounded-lg">{student.dojoId}</span>
+                      <span className="text-[10px] uppercase tracking-wider text-gray-500 bg-brand-dark/5 dark:bg-white/5 px-2 py-1 rounded-lg">{student.dojoId}</span>
                       <span className="text-[10px] uppercase tracking-wider text-brand-gold font-bold bg-brand-gold/10 px-2 py-1 rounded-lg">{student.beltGrade}</span>
                     </div>
                   </div>
@@ -1381,7 +1412,7 @@ const AdminDashboard = () => {
               {/* DESKTOP: Table */}
               <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-brand-dark border-b border-white/10 text-gray-400 text-xs uppercase tracking-wider font-bold">
+                  <thead className="dark:bg-brand-dark bg-brand-dark/5 border-b border-brand-dark/10 dark:border-white/10 text-brand-dark dark:text-gray-400 text-xs uppercase tracking-wider font-bold">
                     <tr>
                       <th className="p-4">Student Details</th>
                       <th className="p-4">Mobile</th>
@@ -1390,12 +1421,12 @@ const AdminDashboard = () => {
                       <th className="p-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5 font-semibold text-xs sm:text-sm text-gray-300">
+                  <tbody className="divide-y dark:divide-white/5 divide-brand-dark/10 font-semibold text-xs sm:text-sm text-brand-dark dark:text-gray-300">
                     {filteredStudents.map((student) => (
-                      <tr key={student.id} className="hover:bg-white/5">
+                      <tr key={student.id} className="hover:bg-brand-dark/5 dark:hover:bg-white/5">
                         <td className="p-4">
                           <div>
-                            <p className="text-white font-extrabold text-sm">{student.fullName}</p>
+                            <p className="text-brand-dark dark:text-white font-extrabold text-sm">{student.fullName}</p>
                             <p className="text-[10px] text-gray-500 font-semibold">{student.email}</p>
                           </div>
                         </td>
@@ -1410,14 +1441,14 @@ const AdminDashboard = () => {
                           <div className="flex items-center justify-end space-x-2">
                             <button
                               onClick={() => handleOpenEdit(student)}
-                              className="p-2 hover:bg-white/5 text-gray-400 hover:text-brand-gold rounded-xl transition-all"
+                              className="p-2 hover:bg-brand-dark/5 dark:hover:bg-white/5 text-gray-500 dark:text-gray-400 hover:text-brand-gold rounded-xl transition-all"
                               title="Edit student"
                             >
                               <Edit2 size={14} />
                             </button>
                             <button
                               onClick={() => alert(`View QR Code for Student ID: ${student.id}`)}
-                              className="p-2 hover:bg-white/5 text-gray-400 hover:text-white rounded-xl transition-all"
+                              className="p-2 hover:bg-brand-dark/5 dark:hover:bg-white/5 text-gray-500 dark:text-gray-400 hover:text-brand-dark dark:hover:text-white rounded-xl transition-all"
                               title="QR Code student ID card"
                             >
                               <Shield size={14} />
@@ -1450,7 +1481,7 @@ const AdminDashboard = () => {
           <div className="space-y-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h1 className="text-2xl sm:text-3xl font-black uppercase text-white tracking-wide">
+                <h1 className="text-2xl sm:text-3xl font-black uppercase dark:text-white text-brand-dark tracking-wide">
                   Dojo <span className="text-brand-gold">Admins</span>
                 </h1>
                 <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider font-semibold">
@@ -1470,7 +1501,7 @@ const AdminDashboard = () => {
             </div>
 
             {/* Filters / Search Bar */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-center justify-between shadow-lg">
+            <div className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-center justify-between shadow-md">
               <div className="relative w-full md:w-80">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
                 <input
@@ -1478,23 +1509,23 @@ const AdminDashboard = () => {
                   placeholder="Search admin name or email..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-brand-dark/50 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs focus:outline-none focus:border-brand-gold/50 text-white placeholder-gray-500"
+                  className="w-full bg-white dark:bg-brand-dark/50 border border-brand-dark/15 dark:border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs focus:outline-none focus:border-brand-gold/50 text-brand-dark dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                 />
               </div>
             </div>
 
             {/* Admins Table */}
-            <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
+            <div className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-3xl overflow-hidden shadow-2xl">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse min-w-[700px]">
                   <thead>
-                    <tr className="bg-white/5 border-b border-white/10 text-gray-400 text-[10px] uppercase tracking-widest font-extrabold">
+                    <tr className="dark:bg-brand-dark bg-brand-dark/5 border-b border-brand-dark/10 dark:border-white/10 text-brand-dark dark:text-gray-400 text-[10px] uppercase tracking-widest font-extrabold">
                       <th className="p-4">Admin Profile</th>
                       <th className="p-4">Assigned Dojos</th>
                       <th className="p-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5 font-semibold text-xs sm:text-sm text-gray-300">
+                  <tbody className="divide-y dark:divide-white/5 divide-brand-dark/10 font-semibold text-xs sm:text-sm text-brand-dark dark:text-gray-300">
                     {students
                       .filter(s => s.role === 'dojo_admin')
                       .filter(s => {
@@ -1502,10 +1533,10 @@ const AdminDashboard = () => {
                         return (s.fullName || '').toLowerCase().includes(q) || (s.email || '').toLowerCase().includes(q);
                       })
                       .map((admin) => (
-                        <tr key={admin.id || admin.uid} className="hover:bg-white/5">
+                        <tr key={admin.id || admin.uid} className="hover:bg-brand-dark/5 dark:hover:bg-white/5">
                           <td className="p-4">
                             <div>
-                              <p className="text-white font-extrabold text-sm">{admin.fullName}</p>
+                              <p className="text-brand-dark dark:text-white font-extrabold text-sm">{admin.fullName}</p>
                               <p className="text-[10px] text-gray-500 font-semibold">{admin.email}</p>
                             </div>
                           </td>
@@ -1531,7 +1562,7 @@ const AdminDashboard = () => {
                             <div className="flex items-center justify-end space-x-2">
                               <button
                                 onClick={() => handleOpenEditAdmin(admin)}
-                                className="p-2 hover:bg-white/5 text-gray-400 hover:text-brand-gold rounded-xl transition-all"
+                                className="p-2 hover:bg-brand-dark/5 dark:hover:bg-white/5 text-gray-500 dark:text-gray-400 hover:text-brand-gold rounded-xl transition-all"
                                 title="Edit Admin"
                               >
                                 <Edit2 size={14} />
@@ -1590,22 +1621,22 @@ const AdminDashboard = () => {
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h1 className="text-2xl sm:text-3xl font-black uppercase text-white tracking-wide">
+                <h1 className="text-2xl sm:text-3xl font-black uppercase dark:text-white text-brand-dark tracking-wide">
                   Dojo <span className="text-brand-red">Attendance</span>
                 </h1>
-                <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider font-semibold">
+                <p className="text-xs dark:text-gray-400 text-gray-600 mt-1 uppercase tracking-wider font-semibold">
                   Mark daily attendance logs, view calculation percentages, and generate official rosters
                 </p>
               </div>
 
               {/* Mode Toggle Buttons */}
-              <div className="flex items-center space-x-2 bg-white/5 p-1 rounded-xl border border-white/10 shrink-0">
+              <div className="flex items-center space-x-2 dark:bg-white/5 bg-white p-1 rounded-xl border border-brand-dark/10 dark:border-white/10 shrink-0 shadow-sm">
                 <button
                   onClick={() => setIsReportMode(false)}
                   className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
                     !isReportMode 
                       ? 'bg-brand-red text-white' 
-                      : 'text-gray-400 hover:text-white'
+                      : 'dark:text-gray-400 text-gray-500 dark:hover:text-white hover:text-brand-dark'
                   }`}
                 >
                   Mark Daily
@@ -1615,7 +1646,7 @@ const AdminDashboard = () => {
                   className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
                     isReportMode 
                       ? 'bg-brand-red text-white' 
-                      : 'text-gray-400 hover:text-white'
+                      : 'dark:text-gray-400 text-gray-500 dark:hover:text-white hover:text-brand-dark'
                   }`}
                 >
                   Attendance Report
@@ -1626,15 +1657,15 @@ const AdminDashboard = () => {
             {!isReportMode ? (
               // Mark Daily Attendance View
               <div className="space-y-6">
-                <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl">
+                <div className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl">
                   <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
                     <div className="space-y-1.5 w-full sm:w-auto">
-                      <label className="text-xs font-extrabold text-gray-300 uppercase tracking-widest block">Select Session Date</label>
+                      <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Select Session Date</label>
                       <input
                         type="date"
                         value={attendanceDate}
                         onChange={(e) => setAttendanceDate(e.target.value)}
-                        className="bg-brand-dark border border-white/15 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-red/50 w-full sm:w-64"
+                        className="dark:bg-brand-dark bg-white border border-brand-dark/15 dark:border-white/15 rounded-xl px-4 py-2.5 text-sm dark:text-white text-brand-dark focus:outline-none focus:border-brand-red/50 w-full sm:w-64"
                       />
                     </div>
 
@@ -1664,9 +1695,9 @@ const AdminDashboard = () => {
                     </div>
                   </div>
 
-                  <div className="bg-brand-dark/50 border border-white/10 rounded-2xl overflow-hidden">
+                  <div className="dark:bg-brand-dark/50 bg-brand-light/50 border border-brand-dark/10 dark:border-white/10 rounded-2xl overflow-hidden">
                     <table className="w-full text-left text-sm">
-                      <thead className="bg-brand-dark/80 border-b border-white/10 text-gray-400 text-xs uppercase tracking-wider font-bold">
+                      <thead className="dark:bg-brand-dark/80 bg-brand-dark/5 border-b border-brand-dark/10 dark:border-white/10 dark:text-gray-400 text-brand-dark/70 text-xs uppercase tracking-wider font-bold">
                         <tr>
                           <th className="p-4">Student Name</th>
                           <th className="p-4 hidden sm:table-cell">Email</th>
@@ -1674,13 +1705,13 @@ const AdminDashboard = () => {
                           <th className="p-4 text-center">Status</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-white/5 font-semibold text-xs sm:text-sm text-gray-300">
+                      <tbody className="divide-y dark:divide-white/5 divide-brand-dark/10 font-semibold text-xs sm:text-sm dark:text-gray-300 text-brand-dark">
                         {filteredStudents.map((student) => {
                           const studentId = student.id || student.uid;
                           const isPresent = attendanceRecords[studentId] || false;
                           return (
-                            <tr key={studentId} className="hover:bg-white/5">
-                              <td className="p-4 text-white font-extrabold">{student.fullName}</td>
+                            <tr key={studentId} className="hover:bg-brand-dark/5 dark:hover:bg-white/5">
+                              <td className="p-4 dark:text-white text-brand-dark font-extrabold">{student.fullName}</td>
                               <td className="p-4 text-gray-500 font-semibold hidden sm:table-cell">{student.email}</td>
                               <td className="p-4 text-brand-gold uppercase hidden sm:table-cell">{student.beltGrade}</td>
                               <td className="p-4">
@@ -1694,7 +1725,7 @@ const AdminDashboard = () => {
                                     }}
                                     className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all border ${
                                       isPresent
-                                        ? 'bg-emerald-500/10 border-emerald-500/35 text-emerald-400'
+                                        ? 'bg-emerald-500/10 border-emerald-500/35 text-emerald-600 dark:text-emerald-400'
                                         : 'bg-brand-red/10 border-brand-red/35 text-brand-red'
                                     }`}
                                   >
@@ -1713,9 +1744,9 @@ const AdminDashboard = () => {
             ) : (
               // Attendance Report / Roster Calculation & PDF View
               <div className="space-y-6">
-                <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl">
+                <div className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl">
                   <div className="flex justify-between items-center no-print">
-                    <h3 className="text-white font-extrabold text-sm uppercase tracking-wider">Attendance Report & Calculations</h3>
+                    <h3 className="dark:text-white text-brand-dark font-extrabold text-sm uppercase tracking-wider">Attendance Report & Calculations</h3>
                     <button
                       onClick={() => window.print()}
                       className="px-6 py-3 bg-brand-gold text-brand-dark font-bold text-xs uppercase tracking-widest rounded-xl transition-all shadow-md flex items-center justify-center space-x-1.5"
@@ -1725,7 +1756,7 @@ const AdminDashboard = () => {
                     </button>
                   </div>
 
-                  <div id="printable-attendance-area" className="bg-brand-dark/50 border border-white/10 rounded-2xl overflow-hidden p-4 sm:p-6 space-y-6 print:border-0 print:bg-white print:text-black">
+                  <div id="printable-attendance-area" className="dark:bg-brand-dark/50 bg-brand-light/50 border border-brand-dark/10 dark:border-white/10 rounded-2xl overflow-hidden p-4 sm:p-6 space-y-6 print:border-0 print:bg-white print:text-black">
                     <div className="hidden print:block text-center space-y-2 pb-6 border-b border-gray-200">
                       <h2 className="text-2xl font-black uppercase text-black">Okinavan Shito Ryu Karate Academy</h2>
                       <p className="text-sm font-bold uppercase tracking-widest text-gray-600">Official Dojo Attendance Roster Report</p>
@@ -1733,7 +1764,7 @@ const AdminDashboard = () => {
                     </div>
 
                     <table className="w-full text-left text-sm print:text-black">
-                      <thead className="bg-brand-dark/80 print:bg-gray-100 border-b border-white/10 print:border-gray-200 text-gray-400 print:text-gray-700 text-xs uppercase tracking-wider font-bold">
+                      <thead className="dark:bg-brand-dark/80 bg-brand-dark/5 print:bg-gray-100 border-b border-brand-dark/10 dark:border-white/10 print:border-gray-200 dark:text-gray-400 text-brand-dark/70 print:text-gray-700 text-xs uppercase tracking-wider font-bold">
                         <tr>
                           <th className="p-4">Student Details</th>
                           <th className="p-4 text-center">Total Sessions</th>
@@ -1741,7 +1772,7 @@ const AdminDashboard = () => {
                           <th className="p-4 text-right">Attendance %</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-white/5 print:divide-gray-200 font-semibold text-xs sm:text-sm text-gray-300 print:text-black">
+                      <tbody className="divide-y dark:divide-white/5 divide-brand-dark/10 print:divide-gray-200 font-semibold text-xs sm:text-sm dark:text-gray-300 text-brand-dark print:text-black">
                         {filteredStudents.map((student) => {
                           const studentId = student.id || student.uid;
                           const studentLogs = dojoLogs.filter(log => log.uid === studentId);
@@ -1749,13 +1780,13 @@ const AdminDashboard = () => {
                           const present = studentLogs.filter(log => log.status === 'Present').length;
                           const percent = total > 0 ? ((present / total) * 100).toFixed(1) : '100.0';
                           return (
-                            <tr key={studentId} className="hover:bg-white/5 print:hover:bg-transparent">
+                            <tr key={studentId} className="hover:bg-brand-dark/5 dark:hover:bg-white/5 print:hover:bg-transparent">
                               <td className="p-4">
-                                <p className="text-white print:text-black font-extrabold">{student.fullName}</p>
+                                <p className="dark:text-white text-brand-dark print:text-black font-extrabold">{student.fullName}</p>
                                 <p className="text-[10px] text-gray-500 print:text-gray-600 font-semibold">{student.email}</p>
                               </td>
-                              <td className="p-4 text-center font-mono text-gray-400 print:text-gray-700">{total}</td>
-                              <td className="p-4 text-center font-mono text-emerald-400 print:text-emerald-700">{present}</td>
+                              <td className="p-4 text-center font-mono dark:text-gray-400 text-gray-600 print:text-gray-700">{total}</td>
+                              <td className="p-4 text-center font-mono text-emerald-600 dark:text-emerald-400 print:text-emerald-700">{present}</td>
                               <td className="p-4 text-right font-black text-brand-gold print:text-amber-800">{percent}%</td>
                             </tr>
                           );
@@ -1773,17 +1804,17 @@ const AdminDashboard = () => {
         {activeView === 'notifications' && (
           <div className="space-y-8 max-w-2xl mx-auto">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-black uppercase text-white tracking-wide">
+              <h1 className="text-2xl sm:text-3xl font-black uppercase dark:text-white text-brand-dark tracking-wide">
                 {editingBroadcastId ? "Edit Dojo" : "Publish Dojo"} <span className="text-brand-red">Broadcasts</span>
               </h1>
-              <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider font-semibold">
+              <p className="text-xs dark:text-gray-400 text-gray-600 mt-1 uppercase tracking-wider font-semibold">
                 {editingBroadcastId 
                   ? "Make changes to the active announcement" 
                   : "Broadcast announcements, test schedules and seminars instantly to Student Dashboards"}
               </p>
             </div>
 
-            <form onSubmit={handlePostNotification} className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl">
+            <form onSubmit={handlePostNotification} className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl">
               {editingBroadcastId && (
                 <div className="bg-brand-red/10 border border-brand-red/30 rounded-2xl p-4 flex items-center justify-between">
                   <div className="flex items-center space-x-2">
@@ -1795,7 +1826,7 @@ const AdminDashboard = () => {
                   <button
                     type="button"
                     onClick={handleCancelEditBroadcast}
-                    className="text-xs text-gray-400 hover:text-white uppercase tracking-wider font-extrabold"
+                    className="text-xs dark:text-gray-400 text-gray-500 dark:hover:text-white hover:text-brand-dark uppercase tracking-wider font-extrabold"
                   >
                     Cancel Edit
                   </button>
@@ -1803,37 +1834,37 @@ const AdminDashboard = () => {
               )}
 
               <div className="space-y-2">
-                <label className="text-xs font-extrabold text-gray-300 uppercase tracking-widest block">Broadcast Title</label>
+                <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Broadcast Title</label>
                 <input
                   type="text"
                   required
                   value={notificationForm.title}
                   onChange={(e) => setNotificationForm({ ...notificationForm, title: e.target.value })}
-                  className="w-full bg-brand-dark border border-white/15 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-red/50 text-white placeholder-gray-500"
+                  className="w-full dark:bg-brand-dark bg-white border border-brand-dark/15 dark:border-white/15 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-red/50 dark:text-white text-brand-dark placeholder-gray-400 dark:placeholder-gray-500"
                   placeholder="Kyu belt grading test scheduled"
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-extrabold text-gray-300 uppercase tracking-widest block">Broadcast Content</label>
+                <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Broadcast Content</label>
                 <textarea
                   required
                   rows={4}
                   value={notificationForm.message}
                   onChange={(e) => setNotificationForm({ ...notificationForm, message: e.target.value })}
-                  className="w-full bg-brand-dark border border-white/15 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-red/50 text-white placeholder-gray-500 leading-relaxed"
+                  className="w-full dark:bg-brand-dark bg-white border border-brand-dark/15 dark:border-white/15 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-red/50 dark:text-white text-brand-dark placeholder-gray-400 dark:placeholder-gray-500 leading-relaxed"
                   placeholder="Enter broadcast details, timing and instructions..."
                 />
               </div>
 
               {role === 'super_admin' ? (
                 <div className="space-y-2">
-                  <label className="text-xs font-extrabold text-gray-300 uppercase tracking-widest block">Target Dojo Branch</label>
+                  <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Target Dojo Branch</label>
                   <select
                     required
                     value={notificationForm.dojoId}
                     onChange={(e) => setNotificationForm({ ...notificationForm, dojoId: e.target.value })}
-                    className="w-full bg-brand-dark border border-white/15 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-red/50 text-gray-300"
+                    className="w-full dark:bg-brand-dark bg-white border border-brand-dark/15 dark:border-white/15 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-red/50 dark:text-gray-300 text-gray-700"
                   >
                     <option value="" disabled>Select target branch</option>
                     <option value="all">Broadcast to All Dojos</option>
@@ -1856,7 +1887,7 @@ const AdminDashboard = () => {
                   <button
                     type="button"
                     onClick={handleCancelEditBroadcast}
-                    className="py-3.5 px-6 bg-white/5 border border-white/10 hover:bg-white/10 text-gray-300 hover:text-white font-bold text-sm tracking-wider uppercase rounded-xl transition-all flex items-center justify-center"
+                    className="py-3.5 px-6 dark:bg-white/5 bg-brand-dark/5 border border-brand-dark/10 dark:border-white/10 dark:hover:bg-white/10 hover:bg-brand-dark/10 dark:text-gray-300 text-gray-600 dark:hover:text-white hover:text-brand-dark font-bold text-sm tracking-wider uppercase rounded-xl transition-all flex items-center justify-center"
                   >
                     Cancel
                   </button>
@@ -1864,10 +1895,10 @@ const AdminDashboard = () => {
               </div>
             </form>
 
-            <div className="border-t border-white/10 my-8"></div>
+            <div className="border-t border-brand-dark/10 dark:border-white/10 my-8"></div>
 
             <div className="flex items-center justify-between pt-4">
-              <h2 className="text-lg sm:text-xl font-black uppercase text-white tracking-wide flex items-center space-x-2">
+              <h2 className="text-lg sm:text-xl font-black uppercase dark:text-white text-brand-dark tracking-wide flex items-center space-x-2">
                 <Bell size={20} className="text-brand-red" />
                 <span>Active Broadcasts</span>
               </h2>
@@ -1886,23 +1917,23 @@ const AdminDashboard = () => {
                   const targetDojo = DOJO_LIST.find(d => d.id === broadcast.dojoId);
                   const dojoName = broadcast.dojoId === 'all' ? 'All Dojos' : (targetDojo ? targetDojo.name : 'Unknown Dojo');
                   return (
-                    <div key={broadcast.id} className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3 hover:border-white/20 transition-all shadow-md">
+                    <div key={broadcast.id} className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-2xl p-5 space-y-3 dark:hover:border-white/20 hover:border-brand-dark/20 transition-all shadow-md">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div>
-                          <h4 className="text-white font-extrabold text-sm sm:text-base">{broadcast.title}</h4>
+                          <h4 className="dark:text-white text-brand-dark font-extrabold text-sm sm:text-base">{broadcast.title}</h4>
                           <p className="text-[10px] text-gray-500 font-medium mt-0.5">Published on: {broadcast.formattedDate || broadcast.date}</p>
                         </div>
-                        <span className="self-start sm:self-center px-2.5 py-0.5 bg-white/10 text-white border border-white/10 rounded-full text-[9px] font-extrabold uppercase tracking-wider">
+                        <span className="self-start sm:self-center px-2.5 py-0.5 dark:bg-white/10 bg-brand-dark/5 dark:text-white text-brand-dark border border-brand-dark/10 dark:border-white/10 rounded-full text-[9px] font-extrabold uppercase tracking-wider">
                           {dojoName}
                         </span>
                       </div>
-                      <p className="text-gray-300 text-xs sm:text-sm whitespace-pre-wrap leading-relaxed">
+                      <p className="dark:text-gray-300 text-gray-700 text-xs sm:text-sm whitespace-pre-wrap leading-relaxed">
                         {broadcast.message}
                       </p>
-                      <div className="flex items-center justify-end space-x-3 pt-3 border-t border-white/5">
+                      <div className="flex items-center justify-end space-x-3 pt-3 border-t border-brand-dark/5 dark:border-white/5">
                         <button
                           onClick={() => handleEditBroadcast(broadcast)}
-                          className="flex items-center space-x-1 px-3 py-1.5 bg-white/5 border border-white/10 hover:bg-white/10 text-gray-300 hover:text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
+                          className="flex items-center space-x-1 px-3 py-1.5 dark:bg-white/5 bg-brand-dark/5 border border-brand-dark/10 dark:border-white/10 dark:hover:bg-white/10 hover:bg-brand-dark/10 dark:text-gray-300 text-gray-600 dark:hover:text-white hover:text-brand-dark rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
                         >
                           <Edit2 size={12} />
                           <span>Edit</span>
@@ -1920,7 +1951,7 @@ const AdminDashboard = () => {
                 })}
               </div>
             ) : (
-              <div className="p-10 text-center border border-dashed border-white/10 rounded-2xl text-gray-500">
+              <div className="p-10 text-center border border-dashed border-brand-dark/10 dark:border-white/10 rounded-2xl text-gray-500">
                 <Bell size={28} className="mx-auto mb-2 opacity-30 text-brand-red" />
                 <p className="font-extrabold uppercase tracking-wider text-xs">No Broadcasts Active</p>
                 <p className="text-[10px] mt-0.5">Announcements published to student dashboards will show up here.</p>
@@ -1933,16 +1964,16 @@ const AdminDashboard = () => {
         {activeView === 'enquiries' && (
           <div className="space-y-6">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-black uppercase text-white tracking-wide">
+              <h1 className="text-2xl sm:text-3xl font-black uppercase dark:text-white text-brand-dark tracking-wide">
                 Dojo <span className="text-brand-gold">Enquiries</span>
               </h1>
-              <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider font-semibold">
+              <p className="text-xs dark:text-gray-400 text-gray-600 mt-1 uppercase tracking-wider font-semibold">
                 {role === 'super_admin' ? 'All Academy Enquiries' : 'Enquiries for your assigned branch(es)'}
               </p>
             </div>
 
             {loadingEnquiries ? (
-              <div className="flex items-center justify-center p-12 bg-white/5 border border-white/10 rounded-3xl">
+              <div className="flex items-center justify-center p-12 dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-3xl">
                 <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-brand-red"></div>
               </div>
             ) : enquiries.length > 0 ? (
@@ -1952,27 +1983,27 @@ const AdminDashboard = () => {
                   const formattedWhatsapp = whatsappNumber.length === 10 ? `91${whatsappNumber}` : whatsappNumber;
 
                   return (
-                    <div key={enq.id} className="bg-white/5 border border-white/10 rounded-3xl p-6 space-y-4 flex flex-col justify-between hover:border-brand-gold/30 transition-all shadow-lg">
+                    <div key={enq.id} className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-3xl p-6 space-y-4 flex flex-col justify-between hover:border-brand-gold/30 transition-all shadow-lg">
                       <div className="space-y-3">
                         <div className="flex justify-between items-start">
                           <div>
-                            <h4 className="text-white font-extrabold text-base">{enq.name}</h4>
-                            <p className="text-xs text-gray-400 mt-0.5">{enq.email}</p>
-                            <p className="text-xs text-gray-400">{enq.phone}</p>
+                            <h4 className="dark:text-white text-brand-dark font-extrabold text-base">{enq.name}</h4>
+                            <p className="text-xs dark:text-gray-400 text-gray-600 mt-0.5">{enq.email}</p>
+                            <p className="text-xs dark:text-gray-400 text-gray-600">{enq.phone}</p>
                           </div>
                           <span className="px-3 py-1 bg-brand-gold/10 text-brand-gold border border-brand-gold/20 rounded-full text-[10px] font-black uppercase tracking-wider">
                             {enq.dojoName || 'General'}
                           </span>
                         </div>
-                        <div className="bg-brand-dark/50 border border-white/5 rounded-2xl p-4 min-h-[100px] flex items-center">
-                          <p className="text-gray-300 text-xs italic leading-relaxed">
+                        <div className="dark:bg-brand-dark/50 bg-brand-light/50 border border-brand-dark/5 dark:border-white/5 rounded-2xl p-4 min-h-[100px] flex items-center">
+                          <p className="dark:text-gray-300 text-gray-700 text-xs italic leading-relaxed">
                             "{enq.message}"
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-white/5">
-                        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-brand-dark/5 dark:border-white/5">
+                        <span className="text-[10px] dark:text-gray-500 text-gray-600 font-bold uppercase tracking-wider">
                           Received: {enq.formattedDate}
                         </span>
                         <div className="flex items-center space-x-2 w-full sm:w-auto">
@@ -1989,7 +2020,7 @@ const AdminDashboard = () => {
                           )}
                           <a
                             href={`mailto:${enq.email}`}
-                            className="flex-grow sm:flex-grow-0 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all flex items-center justify-center space-x-1"
+                            className="flex-grow sm:flex-grow-0 px-3 py-1.5 dark:bg-white/10 bg-brand-dark/10 hover:bg-brand-dark/20 text-brand-dark dark:text-white dark:hover:bg-white/20 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all flex items-center justify-center space-x-1"
                           >
                             <Mail size={12} />
                             <span>Email</span>
@@ -2008,7 +2039,7 @@ const AdminDashboard = () => {
                 })}
               </div>
             ) : (
-              <div className="p-12 text-center border border-dashed border-white/10 rounded-3xl text-gray-500">
+              <div className="p-12 text-center border border-dashed border-brand-dark/10 dark:border-white/10 rounded-3xl text-gray-500">
                 <MessageSquare size={36} className="mx-auto mb-3 opacity-40 text-brand-gold" />
                 <p className="font-extrabold uppercase tracking-wider text-sm mb-1">No Enquiries Registered</p>
                 <p className="text-xs">Incoming contact and interest requests will appear here.</p>
@@ -2021,24 +2052,24 @@ const AdminDashboard = () => {
         {activeView === 'logs' && (
           <div className="space-y-6">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-black uppercase text-white tracking-wide">
+              <h1 className="text-2xl sm:text-3xl font-black uppercase dark:text-white text-brand-dark tracking-wide">
                 Security & <span className="text-brand-red">Activity Logs</span>
               </h1>
-              <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider font-semibold">
+              <p className="text-xs dark:text-gray-400 text-gray-600 mt-1 uppercase tracking-wider font-semibold">
                 Real-time security auditing log of dockets edited
               </p>
             </div>
 
-            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 space-y-4">
+            <div className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-3xl p-6 sm:p-8 space-y-4">
               {activityLogs.map((log, idx) => (
-                <div key={idx} className="flex justify-between items-center text-sm p-4 bg-brand-dark/50 border border-white/5 rounded-2xl text-gray-300">
+                <div key={idx} className="flex justify-between items-center text-sm p-4 bg-brand-light/50 dark:bg-brand-dark/50 border border-brand-dark/5 dark:border-white/5 rounded-2xl dark:text-gray-300 text-gray-700">
                   <div className="flex items-center space-x-3">
                     <Shield size={16} className="text-brand-red shrink-0" />
                     <span>{log.action}</span>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-white font-extrabold text-xs">{log.user}</p>
-                    <p className="text-[10px] text-gray-500 mt-0.5">{log.timestamp}</p>
+                    <p className="dark:text-white text-brand-dark font-extrabold text-xs">{log.user}</p>
+                    <p className="text-[10px] dark:text-gray-500 text-gray-600 mt-0.5">{log.timestamp}</p>
                   </div>
                 </div>
               ))}
@@ -2050,18 +2081,18 @@ const AdminDashboard = () => {
         {activeView === 'wallet' && (
           <div className="space-y-6">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-black uppercase text-white tracking-wide">
+              <h1 className="text-2xl sm:text-3xl font-black uppercase dark:text-white text-brand-dark tracking-wide">
                 My <span className="text-brand-red">Documents Wallet</span>
               </h1>
-              <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider font-semibold">
+              <p className="text-xs dark:text-gray-400 text-gray-600 mt-1 uppercase tracking-wider font-semibold">
                 Store, manage, and download your administrative and personal documents.
               </p>
             </div>
 
             {/* Upload Area */}
-            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 space-y-4">
-              <h2 className="text-sm font-bold uppercase text-white tracking-wide">Upload New Document</h2>
-              <p className="text-xs text-gray-400 leading-relaxed">
+            <div className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-3xl p-6 sm:p-8 space-y-4">
+              <h2 className="text-sm font-bold uppercase dark:text-white text-brand-dark tracking-wide">Upload New Document</h2>
+              <p className="text-xs dark:text-gray-400 text-gray-600 leading-relaxed">
                 Upload your files. Supported formats: <strong>PDF, JPEG, JPG, PNG</strong> (Max 5MB).
               </p>
 
@@ -2073,9 +2104,9 @@ const AdminDashboard = () => {
               )}
 
               {uploading ? (
-                <div className="flex flex-col items-center justify-center py-8 space-y-3 bg-brand-dark border border-white/5 rounded-2xl">
+                <div className="flex flex-col items-center justify-center py-8 space-y-3 dark:bg-brand-dark bg-white border border-brand-dark/5 dark:border-white/5 rounded-2xl">
                   <Loader2 className="animate-spin text-brand-red" size={32} />
-                  <p className="text-xs text-gray-300 font-bold uppercase tracking-wider">
+                  <p className="text-xs dark:text-gray-300 text-gray-700 font-bold uppercase tracking-wider">
                     {replacingDoc ? "Replacing Document..." : "Uploading..."}
                   </p>
                   <button
@@ -2086,9 +2117,9 @@ const AdminDashboard = () => {
                   </button>
                 </div>
               ) : (
-                <label className="flex flex-col items-center justify-center py-10 border-2 border-dashed border-white/10 rounded-3xl cursor-pointer hover:border-brand-red/50 hover:bg-brand-red/5 transition-all text-center">
+                <label className="flex flex-col items-center justify-center py-10 border-2 border-dashed border-brand-dark/10 dark:border-white/10 rounded-3xl cursor-pointer hover:border-brand-red/50 dark:hover:bg-brand-red/5 hover:bg-brand-red/5 transition-all text-center">
                   <Upload className="text-brand-red mb-2" size={32} />
-                  <span className="text-xs text-gray-300 font-extrabold uppercase tracking-widest">
+                  <span className="text-xs dark:text-gray-300 text-gray-700 font-extrabold uppercase tracking-widest">
                     Select File to Upload
                   </span>
                   <input
@@ -2107,7 +2138,7 @@ const AdminDashboard = () => {
 
             {/* List Grid */}
             <div className="space-y-4">
-              <h2 className="text-sm font-bold uppercase text-white tracking-wider flex items-center space-x-2">
+              <h2 className="text-sm font-bold uppercase dark:text-white text-brand-dark tracking-wider flex items-center space-x-2">
                 <FolderOpen size={16} className="text-brand-red" />
                 <span>Stored Documents ({walletDocs.length})</span>
               </h2>
@@ -2119,10 +2150,10 @@ const AdminDashboard = () => {
                     return (
                       <div 
                         key={docItem.id} 
-                        className="p-5 bg-white/5 border border-white/10 hover:border-brand-red/35 rounded-2xl flex items-center justify-between gap-4 group transition-all"
+                        className="p-5 dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 hover:border-brand-red/35 rounded-2xl flex items-center justify-between gap-4 group transition-all"
                       >
                         <div className="flex items-center space-x-4 overflow-hidden">
-                          <div className="p-3 bg-brand-dark/50 border border-white/5 rounded-xl shrink-0">
+                          <div className="p-3 dark:bg-brand-dark/50 bg-brand-light/50 border border-brand-dark/5 dark:border-white/5 rounded-xl shrink-0">
                             {isPDF ? (
                               <FileText className="text-brand-red" size={24} />
                             ) : (
@@ -2130,10 +2161,10 @@ const AdminDashboard = () => {
                             )}
                           </div>
                           <div className="overflow-hidden">
-                            <h3 className="text-white font-extrabold text-sm truncate uppercase" title={docItem.name}>
+                            <h3 className="dark:text-white text-brand-dark font-extrabold text-sm truncate uppercase" title={docItem.name}>
                               {docItem.name}
                             </h3>
-                            <div className="flex items-center space-x-2 text-[10px] text-gray-400 font-bold uppercase mt-0.5">
+                            <div className="flex items-center space-x-2 text-[10px] dark:text-gray-400 text-gray-600 font-bold uppercase mt-0.5">
                               <span>{docItem.size}</span>
                               <span>•</span>
                               <span>{docItem.uploadedAt ? new Date(docItem.uploadedAt).toLocaleDateString() : 'N/A'}</span>
@@ -2147,14 +2178,14 @@ const AdminDashboard = () => {
                             href={docItem.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="p-2 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-all"
+                            className="p-2 dark:hover:bg-white/5 hover:bg-brand-dark/5 rounded-lg text-gray-500 dark:text-gray-400 dark:hover:text-white hover:text-brand-dark transition-all"
                             title="View Document"
                           >
                             <Download size={16} />
                           </a>
 
                           {/* Replace File Trigger */}
-                          <label className="p-2 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white cursor-pointer transition-all" title="Replace Document">
+                          <label className="p-2 dark:hover:bg-white/5 hover:bg-brand-dark/5 rounded-lg text-gray-500 dark:text-gray-400 dark:hover:text-white hover:text-brand-dark cursor-pointer transition-all" title="Replace Document">
                             <RefreshCw size={16} />
                             <input
                               type="file"
@@ -2172,7 +2203,7 @@ const AdminDashboard = () => {
                           {/* Delete Button */}
                           <button
                             onClick={() => handleDocDelete(docItem.id)}
-                            className="p-2 hover:bg-brand-red/10 rounded-lg text-gray-400 hover:text-brand-red transition-all"
+                            className="p-2 dark:hover:bg-white/5 hover:bg-brand-dark/5 rounded-lg text-gray-500 dark:text-gray-400 dark:hover:text-brand-red hover:text-brand-red transition-all"
                             title="Delete Document"
                           >
                             <Trash2 size={16} />
@@ -2183,7 +2214,7 @@ const AdminDashboard = () => {
                   })}
                 </div>
               ) : (
-                <div className="p-12 text-center border border-dashed border-white/10 rounded-3xl text-gray-400 text-sm">
+                <div className="p-12 text-center border border-dashed border-brand-dark/10 dark:border-white/10 rounded-3xl dark:text-gray-400 text-gray-600 text-sm">
                   <FolderOpen size={36} className="mx-auto mb-3 opacity-40 text-brand-red" />
                   <p className="font-bold uppercase tracking-wider mb-1">No Documents Uploaded</p>
                   <p className="text-xs">Your administrative wallet is empty. Upload files above to make them accessible.</p>
@@ -2198,57 +2229,57 @@ const AdminDashboard = () => {
       {/* Student creation modal */}
       <AnimatePresence>
         {isStudentModalOpen && (
-          <div className="fixed inset-0 bg-brand-dark/90 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-brand-dark border border-white/15 w-full max-w-md p-8 rounded-3xl space-y-6 relative"
+              className="dark:bg-brand-dark bg-white border border-brand-dark/10 dark:border-white/15 w-full max-w-md p-8 rounded-3xl space-y-6 relative shadow-2xl"
             >
-              <h3 className="text-white font-black text-xl uppercase tracking-wide">Create Student Profile</h3>
+              <h3 className="dark:text-white text-brand-dark font-black text-xl uppercase tracking-wide">Create Student Profile</h3>
               
-              <form onSubmit={handleCreateStudent} className="space-y-4 text-xs font-bold text-gray-300">
+              <form onSubmit={handleCreateStudent} className="space-y-4 text-xs font-bold dark:text-gray-300 text-gray-700">
                 <div className="space-y-1.5">
-                  <label className="uppercase tracking-widest text-gray-400 block">Full Name</label>
+                  <label className="uppercase tracking-widest dark:text-gray-400 text-gray-600 block">Full Name</label>
                   <input
                     type="text"
                     required
                     value={studentForm.fullName}
                     onChange={(e) => setStudentForm({ ...studentForm, fullName: e.target.value })}
-                    className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white"
+                    className="w-full dark:bg-brand-dark/50 bg-white border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white text-brand-dark focus:outline-none focus:border-brand-gold/50"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="uppercase tracking-widest text-gray-400 block">Email Address</label>
+                  <label className="uppercase tracking-widest dark:text-gray-400 text-gray-600 block">Email Address</label>
                   <input
                     type="email"
                     required
                     value={studentForm.email}
                     onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })}
-                    className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white"
+                    className="w-full dark:bg-brand-dark/50 bg-white border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white text-brand-dark focus:outline-none focus:border-brand-gold/50"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="uppercase tracking-widest text-gray-400 block">Mobile Number</label>
+                  <label className="uppercase tracking-widest dark:text-gray-400 text-gray-600 block">Mobile Number</label>
                   <input
                     type="tel"
                     required
                     value={studentForm.mobileNumber}
                     onChange={(e) => setStudentForm({ ...studentForm, mobileNumber: e.target.value })}
-                    className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white"
+                    className="w-full dark:bg-brand-dark/50 bg-white border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white text-brand-dark focus:outline-none focus:border-brand-gold/50"
                   />
                 </div>
 
                 {role === 'super_admin' ? (
                   <div className="space-y-1.5">
-                    <label className="uppercase tracking-widest text-gray-400 block">Dojo Branch</label>
+                    <label className="uppercase tracking-widest dark:text-gray-400 text-gray-600 block">Dojo Branch</label>
                     <select
                       required
                       value={studentForm.dojoId}
                       onChange={(e) => setStudentForm({ ...studentForm, dojoId: e.target.value })}
-                      className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-gray-300"
+                      className="w-full dark:bg-brand-dark/50 bg-white border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-gray-300 text-gray-700 focus:outline-none focus:border-brand-gold/50"
                     >
                       <option value="" disabled>Select branch</option>
                       {DOJO_LIST.map(dojo => (
@@ -2264,9 +2295,9 @@ const AdminDashboard = () => {
                       : DOJO_LIST.filter(d => d.id === (profile?.dojoId || 'pattam'));
                     return (
                       <div className="space-y-1.5">
-                        <label className="uppercase tracking-widest text-gray-400 block">Dojo Branch</label>
+                        <label className="uppercase tracking-widest dark:text-gray-400 text-gray-600 block">Dojo Branch</label>
                         {adminDojos.length === 1 ? (
-                          <div className="w-full bg-brand-dark/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-brand-gold font-bold uppercase tracking-wider">
+                          <div className="w-full dark:bg-brand-dark/30 bg-brand-light border border-brand-dark/10 dark:border-white/10 rounded-xl px-4 py-3 text-sm text-brand-gold font-bold uppercase tracking-wider">
                             {adminDojos[0]?.name || 'Pattam Dojo'}
                           </div>
                         ) : (
@@ -2274,7 +2305,7 @@ const AdminDashboard = () => {
                             required
                             value={studentForm.dojoId}
                             onChange={(e) => setStudentForm({ ...studentForm, dojoId: e.target.value })}
-                            className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-gray-300"
+                            className="w-full dark:bg-brand-dark/50 bg-white border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-gray-300 text-gray-700 focus:outline-none focus:border-brand-gold/50"
                           >
                             <option value="" disabled>Select branch</option>
                             {adminDojos.map(dojo => (
@@ -2289,11 +2320,11 @@ const AdminDashboard = () => {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5 col-span-2">
-                    <label className="uppercase tracking-widest text-gray-400 block">Starting Belt</label>
+                    <label className="uppercase tracking-widest dark:text-gray-400 text-gray-600 block">Starting Belt</label>
                     <select
                       value={studentForm.beltGrade}
                       onChange={(e) => setStudentForm({ ...studentForm, beltGrade: e.target.value })}
-                      className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-gray-300"
+                      className="w-full dark:bg-brand-dark/50 bg-white border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-gray-300 text-gray-700 focus:outline-none focus:border-brand-gold/50"
                     >
                       {BELT_GRADES.map(belt => (
                         <option key={belt} value={belt}>{belt}</option>
@@ -2302,13 +2333,13 @@ const AdminDashboard = () => {
                   </div>
 
                   <div className="space-y-1.5 col-span-2">
-                    <label className="uppercase tracking-widest text-gray-400 block">Pending Balance Dues (₹)</label>
+                    <label className="uppercase tracking-widest dark:text-gray-400 text-gray-600 block">Pending Balance Dues (₹)</label>
                     <input
                       type="number"
                       min="0"
                       value={studentForm.pendingFees || '0'}
                       onChange={(e) => setStudentForm({ ...studentForm, pendingFees: e.target.value })}
-                      className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-gold/50"
+                      className="w-full dark:bg-brand-dark/50 bg-white border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white text-brand-dark focus:outline-none focus:border-brand-gold/50"
                       placeholder="e.g. 1500"
                     />
                   </div>
@@ -2324,7 +2355,7 @@ const AdminDashboard = () => {
                   <button
                     onClick={() => setIsStudentModalOpen(false)}
                     type="button"
-                    className="px-6 py-3.5 border border-white/20 hover:bg-white/5 text-gray-300 rounded-xl transition-all"
+                    className="px-6 py-3.5 border border-brand-dark/20 dark:border-white/20 dark:hover:bg-white/5 hover:bg-brand-dark/5 text-gray-600 dark:text-gray-300 rounded-xl transition-all"
                   >
                     Cancel
                   </button>
@@ -2343,46 +2374,46 @@ const AdminDashboard = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-brand-dark border border-white/10 rounded-3xl p-8 w-full max-w-md shadow-2xl space-y-6"
+              className="dark:bg-brand-dark bg-white border border-brand-dark/10 dark:border-white/10 rounded-3xl p-8 w-full max-w-md shadow-2xl space-y-6"
             >
               <div>
                 <div className="flex items-center space-x-3 mb-1">
                   <UserCog size={20} className="text-brand-gold" />
-                  <h2 className="text-xl font-black uppercase text-white tracking-wide">Add Dojo Admin</h2>
+                  <h2 className="text-xl font-black uppercase dark:text-white text-brand-dark tracking-wide">Add Dojo Admin</h2>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">Creates a login account with default password <span className="font-bold text-white">test12</span>. A password reset email will be sent so they can set their own.</p>
+                <p className="text-xs dark:text-gray-400 text-gray-600 mt-1">Creates a login account with default password <span className="font-bold dark:text-white text-brand-dark">test12</span>. A password reset email will be sent so they can set their own.</p>
               </div>
 
               <form onSubmit={handleCreateAdmin} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-extrabold text-gray-300 uppercase tracking-widest block">Full Name</label>
+                  <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Full Name</label>
                   <input
                     type="text"
                     required
                     value={adminForm.fullName}
                     onChange={(e) => setAdminForm({ ...adminForm, fullName: e.target.value })}
                     placeholder="e.g. Sensei John Doe"
-                    className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-gold/50"
+                    className="w-full dark:bg-brand-dark/50 bg-white border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white text-brand-dark placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:border-brand-gold/50"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-extrabold text-gray-300 uppercase tracking-widest block">Email Address</label>
+                  <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Email Address</label>
                   <input
                     type="email"
                     required
                     value={adminForm.email}
                     onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
                     placeholder="admin@example.com"
-                    className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-gold/50"
+                    className="w-full dark:bg-brand-dark/50 bg-white border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white text-brand-dark placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:border-brand-gold/50"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-extrabold text-gray-300 uppercase tracking-widest block">Dojo Branches (select all that apply)</label>
-                  <div className="bg-brand-dark/50 border border-white/10 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto">
+                  <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Dojo Branches (select all that apply)</label>
+                  <div className="dark:bg-brand-dark/50 bg-white border border-brand-dark/15 dark:border-white/10 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto">
                     {DOJO_LIST.map(dojo => (
-                      <label key={dojo.id} className="flex items-center space-x-3 cursor-pointer group hover:bg-white/5 px-2 py-1.5 rounded-lg transition-all">
+                      <label key={dojo.id} className="flex items-center space-x-3 cursor-pointer group dark:hover:bg-white/5 hover:bg-brand-dark/5 px-2 py-1.5 rounded-lg transition-all">
                         <input
                           type="checkbox"
                           checked={adminForm.dojoIds.includes(dojo.id)}
@@ -2396,8 +2427,8 @@ const AdminDashboard = () => {
                           className="accent-brand-gold w-4 h-4"
                         />
                         <div>
-                          <p className="text-white text-xs font-bold">{dojo.name}</p>
-                          <p className="text-gray-500 text-[10px]">{dojo.instructor}</p>
+                          <p className="dark:text-white text-brand-dark text-xs font-bold">{dojo.name}</p>
+                          <p className="dark:text-gray-500 text-gray-500 text-[10px]">{dojo.instructor}</p>
                         </div>
                       </label>
                     ))}
@@ -2407,9 +2438,9 @@ const AdminDashboard = () => {
                   )}
                 </div>
 
-                <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-gray-400 space-y-1">
-                  <p><span className="text-white font-bold">Default Password:</span> test12</p>
-                  <p><span className="text-white font-bold">Reset Email:</span> Sent automatically so admin can change it</p>
+                <div className="dark:bg-white/5 bg-brand-dark/5 border border-brand-dark/10 dark:border-white/10 rounded-xl px-4 py-3 text-xs dark:text-gray-400 text-gray-600 space-y-1">
+                  <p><span className="dark:text-white text-brand-dark font-bold">Default Password:</span> test12</p>
+                  <p><span className="dark:text-white text-brand-dark font-bold">Reset Email:</span> Sent automatically so admin can change it</p>
                 </div>
 
                 <div className="flex items-center space-x-3 pt-2">
@@ -2424,7 +2455,7 @@ const AdminDashboard = () => {
                   <button
                     onClick={() => { setIsAdminModalOpen(false); setAdminForm({ fullName: '', email: '', dojoIds: [] }); }}
                     type="button"
-                    className="px-6 py-3.5 border border-white/20 hover:bg-white/5 text-gray-300 rounded-xl transition-all"
+                    className="px-6 py-3.5 border border-brand-dark/20 dark:border-white/20 dark:hover:bg-white/5 hover:bg-brand-dark/5 text-gray-600 dark:text-gray-300 rounded-xl transition-all"
                   >
                     Cancel
                   </button>
@@ -2443,45 +2474,45 @@ const AdminDashboard = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-brand-dark border border-white/10 rounded-3xl p-8 w-full max-w-lg shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto"
+              className="dark:bg-brand-dark bg-white border border-brand-dark/10 dark:border-white/10 rounded-3xl p-8 w-full max-w-lg shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto"
             >
               <div>
                 <div className="flex items-center space-x-3 mb-1">
                   <Edit2 size={18} className="text-brand-gold" />
-                  <h2 className="text-xl font-black uppercase text-white tracking-wide">Edit Student Profile</h2>
+                  <h2 className="text-xl font-black uppercase dark:text-white text-brand-dark tracking-wide">Edit Student Profile</h2>
                 </div>
-                <p className="text-xs text-gray-400">Editing: <span className="text-white font-bold">{editingStudent.email}</span></p>
+                <p className="text-xs dark:text-gray-400 text-gray-600">Editing: <span className="dark:text-white text-brand-dark font-bold">{editingStudent.email}</span></p>
               </div>
 
               <form onSubmit={handleEditStudent} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-extrabold text-gray-300 uppercase tracking-widest block">Full Name</label>
+                    <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Full Name</label>
                     <input
                       type="text"
                       required
                       value={editForm.fullName}
                       onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
-                      className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-gold/50"
+                      className="w-full dark:bg-brand-dark/50 bg-white border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white text-brand-dark focus:outline-none focus:border-brand-gold/50"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-extrabold text-gray-300 uppercase tracking-widest block">Mobile Number</label>
+                    <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Mobile Number</label>
                     <input
                       type="tel"
                       value={editForm.mobileNumber}
                       onChange={(e) => setEditForm({ ...editForm, mobileNumber: e.target.value })}
-                      className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-gold/50"
+                      className="w-full dark:bg-brand-dark/50 bg-white border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white text-brand-dark focus:outline-none focus:border-brand-gold/50"
                     />
                   </div>
 
                   <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-xs font-extrabold text-gray-300 uppercase tracking-widest block">Belt Grade</label>
+                    <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Belt Grade</label>
                     <select
                       value={editForm.beltGrade}
                       onChange={(e) => setEditForm({ ...editForm, beltGrade: e.target.value })}
-                      className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-gray-300 focus:outline-none focus:border-brand-gold/50"
+                      className="w-full dark:bg-brand-dark/50 bg-white border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-gray-300 text-gray-700 focus:outline-none focus:border-brand-gold/50"
                     >
                       {BELT_GRADES.map(belt => (
                         <option key={belt} value={belt}>{belt}</option>
@@ -2489,7 +2520,7 @@ const AdminDashboard = () => {
                     </select>
                   </div>
 
-                  <div className="space-y-1.5 sm:col-span-2 bg-white/5 p-4 border border-white/10 rounded-2xl flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+                  <div className="space-y-1.5 sm:col-span-2 dark:bg-white/5 bg-brand-light/50 p-4 border border-brand-dark/10 dark:border-white/10 rounded-2xl flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
                     <div className="space-y-1.5 flex-grow">
                       <label className="text-xs font-extrabold text-brand-gold uppercase tracking-widest block">Pending Balance Dues (₹)</label>
                       <input
@@ -2504,7 +2535,7 @@ const AdminDashboard = () => {
                             feesStatus: Number(val) > 0 ? 'pending' : 'paid'
                           });
                         }}
-                        className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-gold/50"
+                        className="w-full dark:bg-brand-dark/50 bg-white border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white text-brand-dark focus:outline-none focus:border-brand-gold/50"
                         placeholder="e.g. 1500"
                       />
                     </div>
@@ -2521,11 +2552,11 @@ const AdminDashboard = () => {
 
                   {role === 'super_admin' && (
                     <div className="space-y-1.5 sm:col-span-2">
-                      <label className="text-xs font-extrabold text-gray-300 uppercase tracking-widest block">Dojo Branch</label>
+                      <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Dojo Branch</label>
                       <select
                         value={editForm.dojoId}
                         onChange={(e) => setEditForm({ ...editForm, dojoId: e.target.value })}
-                        className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-gray-300 focus:outline-none focus:border-brand-gold/50"
+                        className="w-full dark:bg-brand-dark/50 bg-white border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-gray-300 text-gray-700 focus:outline-none focus:border-brand-gold/50"
                       >
                         <option value="" disabled>Select branch</option>
                         {DOJO_LIST.map(dojo => (
@@ -2536,23 +2567,23 @@ const AdminDashboard = () => {
                   )}
 
                   <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-xs font-extrabold text-gray-300 uppercase tracking-widest block">Address</label>
+                    <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Address</label>
                     <input
                       type="text"
                       value={editForm.address}
                       onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                      className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-gold/50"
+                      className="w-full dark:bg-brand-dark/50 bg-white border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white text-brand-dark focus:outline-none focus:border-brand-gold/50"
                       placeholder="Student's home address"
                     />
                   </div>
 
                   <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-xs font-extrabold text-gray-300 uppercase tracking-widest block">Emergency Contact</label>
+                    <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Emergency Contact</label>
                     <input
                       type="text"
                       value={editForm.emergencyContact}
                       onChange={(e) => setEditForm({ ...editForm, emergencyContact: e.target.value })}
-                      className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-gold/50"
+                      className="w-full dark:bg-brand-dark/50 bg-white border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white text-brand-dark focus:outline-none focus:border-brand-gold/50"
                       placeholder="Parent / Guardian phone number"
                     />
                   </div>
@@ -2569,7 +2600,7 @@ const AdminDashboard = () => {
                   <button
                     type="button"
                     onClick={() => setEditingStudent(null)}
-                    className="px-6 py-3.5 border border-white/20 hover:bg-white/5 text-gray-300 rounded-xl transition-all"
+                    className="px-6 py-3.5 border border-brand-dark/20 dark:border-white/20 dark:hover:bg-white/5 hover:bg-brand-dark/5 text-gray-600 dark:text-gray-300 rounded-xl transition-all"
                   >
                     Cancel
                   </button>
@@ -2588,33 +2619,33 @@ const AdminDashboard = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-brand-dark border border-white/10 rounded-3xl p-8 w-full max-w-md shadow-2xl space-y-6"
+              className="dark:bg-brand-dark bg-white border border-brand-dark/10 dark:border-white/10 rounded-3xl p-8 w-full max-w-md shadow-2xl space-y-6"
             >
               <div>
                 <div className="flex items-center space-x-3 mb-1">
                   <UserCog size={20} className="text-brand-gold" />
-                  <h2 className="text-xl font-black uppercase text-white tracking-wide">Edit Dojo Admin</h2>
+                  <h2 className="text-xl font-black uppercase dark:text-white text-brand-dark tracking-wide">Edit Dojo Admin</h2>
                 </div>
-                <p className="text-xs text-gray-400">Editing profile for: <span className="text-white font-bold">{editingAdmin.email}</span></p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Editing profile for: <span className="dark:text-white text-brand-dark font-bold">{editingAdmin.email}</span></p>
               </div>
 
               <form onSubmit={handleSaveAdmin} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-extrabold text-gray-300 uppercase tracking-widest block">Full Name</label>
+                  <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Full Name</label>
                   <input
                     type="text"
                     required
                     value={editAdminForm.fullName}
                     onChange={(e) => setEditAdminForm({ ...editAdminForm, fullName: e.target.value })}
-                    className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-gold/50"
+                    className="w-full dark:bg-brand-dark/50 bg-white border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white text-brand-dark placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:border-brand-gold/50"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-extrabold text-gray-300 uppercase tracking-widest block">Dojo Branches (select all that apply)</label>
-                  <div className="bg-brand-dark/50 border border-white/10 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto">
+                  <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Dojo Branches (select all that apply)</label>
+                  <div className="dark:bg-brand-dark/50 bg-white border border-brand-dark/15 dark:border-white/10 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto">
                     {DOJO_LIST.map(dojo => (
-                      <label key={dojo.id} className="flex items-center space-x-3 cursor-pointer group hover:bg-white/5 px-2 py-1.5 rounded-lg transition-all">
+                      <label key={dojo.id} className="flex items-center space-x-3 cursor-pointer group dark:hover:bg-white/5 hover:bg-brand-dark/5 px-2 py-1.5 rounded-lg transition-all">
                         <input
                           type="checkbox"
                           checked={editAdminForm.dojoIds.includes(dojo.id)}
@@ -2628,8 +2659,8 @@ const AdminDashboard = () => {
                           className="accent-brand-gold w-4 h-4"
                         />
                         <div>
-                          <p className="text-white text-xs font-bold">{dojo.name}</p>
-                          <p className="text-gray-500 text-[10px]">{dojo.instructor}</p>
+                          <p className="dark:text-white text-brand-dark text-xs font-bold">{dojo.name}</p>
+                          <p className="text-gray-500 dark:text-gray-400 text-[10px]">{dojo.instructor}</p>
                         </div>
                       </label>
                     ))}
@@ -2651,7 +2682,7 @@ const AdminDashboard = () => {
                   <button
                     onClick={() => setEditingAdmin(null)}
                     type="button"
-                    className="px-6 py-3.5 border border-white/20 hover:bg-white/5 text-gray-300 rounded-xl transition-all"
+                    className="px-6 py-3.5 border border-brand-dark/20 dark:border-white/20 dark:hover:bg-white/5 hover:bg-brand-dark/5 text-gray-600 dark:text-gray-300 rounded-xl transition-all"
                   >
                     Cancel
                   </button>
