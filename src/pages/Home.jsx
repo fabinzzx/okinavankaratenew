@@ -117,7 +117,7 @@ const Home = () => {
               ))}
             </h1>
             <p className="text-gray-300 max-w-xl mx-auto text-sm sm:text-base mb-8 leading-relaxed">
-              We empower kids, teens, and adults to achieve fitness, discipline, and outstanding mental focus through authentic martial arts training.
+              Voted as one of the <strong>best karate academies in Kerala, India</strong>. We empower kids, teens, and adults to achieve fitness, discipline, and outstanding mental focus through traditional martial arts training.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link 
@@ -287,7 +287,7 @@ const Home = () => {
             </h2>
             <div className="h-1 w-20 bg-brand-red mx-auto mb-4" />
             <p className="text-gray-500 dark:text-gray-400 max-w-xl mx-auto">
-              Learn about our pioneering digital student records, online login portals, and official QR verification systems.
+              Discover why we are rated among the <strong>best karate academies in Kerala, India</strong>, and check out the features that make this the <strong>best karate website in Kerala</strong>.
             </p>
           </div>
 
