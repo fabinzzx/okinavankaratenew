@@ -1003,6 +1003,22 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleDeleteEnquiry = async (enquiryId) => {
+    if (!window.confirm("Are you sure you want to delete this enquiry?")) return;
+    try {
+      await deleteDoc(doc(db, 'enquiries', enquiryId));
+      setActivityLogs(prev => [
+        { timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `Enquiry deleted`, user: role === 'super_admin' ? 'Super Admin' : 'Dojo Admin' },
+        ...prev
+      ]);
+      alert("Enquiry deleted successfully!");
+      setEnquiries(prev => prev.filter(e => e.id !== enquiryId));
+    } catch (error) {
+      console.error("Error deleting enquiry:", error);
+      alert("Failed to delete enquiry.");
+    }
+  };
+
   // Dynamic chart data calculation - use DOJO_LIST as source of truth
   const branches = DOJO_LIST.map(d => ({ id: d.id, name: d.name }));
 
@@ -1934,6 +1950,13 @@ const AdminDashboard = () => {
                             <Mail size={12} />
                             <span>Email</span>
                           </a>
+                          <button
+                            onClick={() => handleDeleteEnquiry(enq.id)}
+                            className="flex-grow sm:flex-grow-0 px-3 py-1.5 bg-brand-red/10 border border-brand-red/20 hover:bg-brand-red/20 text-brand-red text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all flex items-center justify-center space-x-1"
+                          >
+                            <Trash2 size={12} />
+                            <span>Delete</span>
+                          </button>
                         </div>
                       </div>
                     </div>
