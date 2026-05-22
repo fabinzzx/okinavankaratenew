@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, Sparkles, Trophy, Award, MapPin, ChevronRight, Phone, HelpCircle, ChevronDown } from 'lucide-react';
+import { Shield, Sparkles, Trophy, Award, MapPin, ChevronRight, Phone, HelpCircle, ChevronDown, FolderOpen } from 'lucide-react';
 import { INSTRUCTOR_LIST } from '../data/instructors';
 import { DOJO_LIST } from '../data/dojos';
 
@@ -22,13 +22,23 @@ const Home = () => {
     },
     {
       question: "What features are included in the Student Login Portal?",
-      answer: "Authorized students receive unique credentials to log in. Their student dashboard enables them to view their session attendance logs, check belt grade progression history, track pending fees, and get broadcast notifications about grading tests or seminars directly from Dojo Admins.",
+      answer: "Authorized students receive unique credentials to log in. Their student dashboard enables them to track their session attendance logs, view belt grade history, monitor pending fees, store records in their personal Document Wallet, and receive real-time broadcast announcements from Dojo Senseis.",
       icon: <Shield className="text-emerald-500" size={20} />
     },
     {
       question: "How does the academy maintain digital student records?",
       answer: "We store secure cloud records of every student profile, belt rank, fee transaction, and attendance log. Branch instructors (Dojo Admins) update records in real-time, which are securely verified and audited by Kyoshi Thomas Kathanatt (Super Admin).",
       icon: <MapPin className="text-blue-500" size={20} />
+    },
+    {
+      question: "What is the Dojo Document Wallet?",
+      answer: "The Document Wallet is an integrated digital storage system powered by Cloudinary. Students can upload, view, and store scan files of their official rank certificates, karate licenses, and transcripts. Dojo Admins can verify, audit, and replace these documents directly from their control panel.",
+      icon: <FolderOpen className="text-brand-gold" size={20} />
+    },
+    {
+      question: "How do Dojo Broadcasts and student enquiries work?",
+      answer: "Senseis (Dojo Admins) publish, edit, or delete real-time dojo broadcasts to announce grading schedules, tournament news, and seminar dates. These appear instantly on student dashboards. Students can/may submit enquiries directly through the website, which are then audited or resolved via the Admin console.",
+      icon: <HelpCircle className="text-brand-red" size={20} />
     }
   ];
 
