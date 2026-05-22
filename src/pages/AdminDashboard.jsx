@@ -94,6 +94,59 @@ const AdminDashboard = () => {
   const [enquiries, setEnquiries] = useState([]);
   const [loadingEnquiries, setLoadingEnquiries] = useState(false);
 
+  // Dojo Broadcast states
+  const [broadcasts, setBroadcasts] = useState([]);
+  const [loadingBroadcasts, setLoadingBroadcasts] = useState(false);
+  const [editingBroadcastId, setEditingBroadcastId] = useState(null);
+
+  const fetchBroadcasts = async () => {
+    setLoadingBroadcasts(true);
+    try {
+      const querySnapshot = await getDocs(collection(db, 'notifications'));
+      const list = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        let formattedDate = data.date || '';
+        if (data.createdAt?.seconds) {
+          formattedDate = new Date(data.createdAt.seconds * 1000).toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+          });
+        }
+        return {
+          id: doc.id,
+          ...data,
+          formattedDate
+        };
+      });
+
+      // Sort descending
+      const sorted = list.sort((a, b) => {
+        const timeA = a.createdAt?.seconds || (a.date ? new Date(a.date).getTime() / 1000 : 0);
+        const timeB = b.createdAt?.seconds || (b.date ? new Date(b.date).getTime() / 1000 : 0);
+        return timeB - timeA;
+      });
+
+      if (role === 'super_admin') {
+        setBroadcasts(sorted);
+      } else {
+        const currentDojoId = profile?.dojoId || 'pattam';
+        const filtered = sorted.filter(b => b.dojoId === currentDojoId || b.dojoId === 'all');
+        setBroadcasts(filtered);
+      }
+    } catch (error) {
+      console.error("Error loading broadcasts", error);
+    } finally {
+      setLoadingBroadcasts(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeView === 'notifications') {
+      fetchBroadcasts();
+    }
+  }, [activeView, role, profile]);
+
   // Cloudinary Admin Wallet State
   const [walletDocs, setWalletDocs] = useState([]);
   const [uploading, setUploading] = useState(false);
@@ -869,23 +922,84 @@ const AdminDashboard = () => {
   const handlePostNotification = async (e) => {
     e.preventDefault();
     try {
-      const notifRef = doc(collection(db, 'notifications'));
       const targetDojoId = role === 'super_admin' ? notificationForm.dojoId : (profile?.dojoId || 'pattam');
-      await setDoc(notifRef, {
-        title: notificationForm.title,
-        message: notificationForm.message,
-        dojoId: targetDojoId,
-        date: new Date().toISOString().split('T')[0],
-        createdAt: serverTimestamp()
-      });
-      setActivityLogs(prev => [
-        { timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `Broadcast published: "${notificationForm.title}"`, user: role === 'super_admin' ? 'Super Admin' : 'Dojo Admin' },
-        ...prev
-      ]);
-      alert("Dojo Notification published!");
+      
+      if (editingBroadcastId) {
+        // Edit Mode
+        const notifRef = doc(db, 'notifications', editingBroadcastId);
+        await updateDoc(notifRef, {
+          title: notificationForm.title,
+          message: notificationForm.message,
+          dojoId: targetDojoId
+        });
+        setActivityLogs(prev => [
+          { timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `Broadcast edited: "${notificationForm.title}"`, user: role === 'super_admin' ? 'Super Admin' : 'Dojo Admin' },
+          ...prev
+        ]);
+        alert("Broadcast updated successfully!");
+        setEditingBroadcastId(null);
+      } else {
+        // Create Mode
+        const notifRef = doc(collection(db, 'notifications'));
+        await setDoc(notifRef, {
+          title: notificationForm.title,
+          message: notificationForm.message,
+          dojoId: targetDojoId,
+          date: new Date().toISOString().split('T')[0],
+          createdAt: serverTimestamp()
+        });
+        setActivityLogs(prev => [
+          { timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `Broadcast published: "${notificationForm.title}"`, user: role === 'super_admin' ? 'Super Admin' : 'Dojo Admin' },
+          ...prev
+        ]);
+        alert("Dojo Notification published!");
+      }
       setNotificationForm({ title: '', message: '', dojoId: '' });
+      fetchBroadcasts();
     } catch (error) {
       console.error(error);
+      alert("Failed to save broadcast.");
+    }
+  };
+
+  const handleEditBroadcast = (broadcast) => {
+    setEditingBroadcastId(broadcast.id);
+    setNotificationForm({
+      title: broadcast.title,
+      message: broadcast.message,
+      dojoId: broadcast.dojoId || 'all'
+    });
+
+    const scrollContainer = document.getElementById("admin-main-content");
+    if (scrollContainer) {
+      scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleCancelEditBroadcast = () => {
+    setEditingBroadcastId(null);
+    setNotificationForm({ title: '', message: '', dojoId: '' });
+  };
+
+  const handleDeleteBroadcast = async (broadcastId) => {
+    if (!window.confirm("Are you sure you want to delete this broadcast?")) return;
+    try {
+      await deleteDoc(doc(db, 'notifications', broadcastId));
+      setActivityLogs(prev => [
+        { timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `Broadcast deleted`, user: role === 'super_admin' ? 'Super Admin' : 'Dojo Admin' },
+        ...prev
+      ]);
+      alert("Broadcast deleted successfully!");
+      if (editingBroadcastId === broadcastId) {
+        setEditingBroadcastId(null);
+        setNotificationForm({ title: '', message: '', dojoId: '' });
+      }
+      fetchBroadcasts();
+    } catch (error) {
+      console.error("Error deleting broadcast", error);
+      alert("Failed to delete broadcast.");
     }
   };
 
@@ -994,7 +1108,7 @@ const AdminDashboard = () => {
       </div>
 
       {/* Main Panel Content Area */}
-      <div className="flex-grow p-6 sm:p-10 space-y-8 overflow-y-auto">
+      <div id="admin-main-content" className="flex-grow p-6 sm:p-10 space-y-8 overflow-y-auto">
         
         {/* 1. OVERVIEW VIEW */}
         {activeView === 'overview' && (
@@ -1600,14 +1714,34 @@ const AdminDashboard = () => {
           <div className="space-y-8 max-w-2xl mx-auto">
             <div>
               <h1 className="text-2xl sm:text-3xl font-black uppercase text-white tracking-wide">
-                Publish Dojo <span className="text-brand-red">Broadcasts</span>
+                {editingBroadcastId ? "Edit Dojo" : "Publish Dojo"} <span className="text-brand-red">Broadcasts</span>
               </h1>
               <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider font-semibold">
-                Broadcast announcements, test schedules and seminars instantly to Student Dashboards
+                {editingBroadcastId 
+                  ? "Make changes to the active announcement" 
+                  : "Broadcast announcements, test schedules and seminars instantly to Student Dashboards"}
               </p>
             </div>
 
             <form onSubmit={handlePostNotification} className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl">
+              {editingBroadcastId && (
+                <div className="bg-brand-red/10 border border-brand-red/30 rounded-2xl p-4 flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Edit2 className="text-brand-red animate-pulse" size={16} />
+                    <span className="text-xs text-brand-red font-bold uppercase tracking-wider">
+                      Editing Mode Active
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCancelEditBroadcast}
+                    className="text-xs text-gray-400 hover:text-white uppercase tracking-wider font-extrabold"
+                  >
+                    Cancel Edit
+                  </button>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <label className="text-xs font-extrabold text-gray-300 uppercase tracking-widest block">Broadcast Title</label>
                 <input
@@ -1650,14 +1784,88 @@ const AdminDashboard = () => {
                 </div>
               ) : null}
 
-              <button
-                type="submit"
-                className="w-full py-3.5 bg-brand-red hover:bg-red-700 text-white font-bold text-sm tracking-wider uppercase rounded-xl transition-all shadow-md flex items-center justify-center space-x-2"
-              >
-                <Plus size={16} />
-                <span>Publish Broadcast</span>
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  type="submit"
+                  className="flex-1 py-3.5 bg-brand-red hover:bg-red-700 text-white font-bold text-sm tracking-wider uppercase rounded-xl transition-all shadow-md flex items-center justify-center space-x-2"
+                >
+                  {editingBroadcastId ? <Settings size={16} /> : <Plus size={16} />}
+                  <span>{editingBroadcastId ? "Save Changes" : "Publish Broadcast"}</span>
+                </button>
+                {editingBroadcastId && (
+                  <button
+                    type="button"
+                    onClick={handleCancelEditBroadcast}
+                    className="py-3.5 px-6 bg-white/5 border border-white/10 hover:bg-white/10 text-gray-300 hover:text-white font-bold text-sm tracking-wider uppercase rounded-xl transition-all flex items-center justify-center"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
             </form>
+
+            <div className="border-t border-white/10 my-8"></div>
+
+            <div className="flex items-center justify-between pt-4">
+              <h2 className="text-lg sm:text-xl font-black uppercase text-white tracking-wide flex items-center space-x-2">
+                <Bell size={20} className="text-brand-red" />
+                <span>Active Broadcasts</span>
+              </h2>
+              <span className="px-3 py-1 bg-brand-red/10 border border-brand-red/20 text-brand-red rounded-full text-xs font-bold">
+                {broadcasts.length}
+              </span>
+            </div>
+
+            {loadingBroadcasts ? (
+              <div className="flex justify-center items-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-brand-red"></div>
+              </div>
+            ) : broadcasts.length > 0 ? (
+              <div className="space-y-4">
+                {broadcasts.map((broadcast) => {
+                  const targetDojo = DOJO_LIST.find(d => d.id === broadcast.dojoId);
+                  const dojoName = broadcast.dojoId === 'all' ? 'All Dojos' : (targetDojo ? targetDojo.name : 'Unknown Dojo');
+                  return (
+                    <div key={broadcast.id} className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3 hover:border-white/20 transition-all shadow-md">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <h4 className="text-white font-extrabold text-sm sm:text-base">{broadcast.title}</h4>
+                          <p className="text-[10px] text-gray-500 font-medium mt-0.5">Published on: {broadcast.formattedDate || broadcast.date}</p>
+                        </div>
+                        <span className="self-start sm:self-center px-2.5 py-0.5 bg-white/10 text-white border border-white/10 rounded-full text-[9px] font-extrabold uppercase tracking-wider">
+                          {dojoName}
+                        </span>
+                      </div>
+                      <p className="text-gray-300 text-xs sm:text-sm whitespace-pre-wrap leading-relaxed">
+                        {broadcast.message}
+                      </p>
+                      <div className="flex items-center justify-end space-x-3 pt-3 border-t border-white/5">
+                        <button
+                          onClick={() => handleEditBroadcast(broadcast)}
+                          className="flex items-center space-x-1 px-3 py-1.5 bg-white/5 border border-white/10 hover:bg-white/10 text-gray-300 hover:text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
+                        >
+                          <Edit2 size={12} />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteBroadcast(broadcast.id)}
+                          className="flex items-center space-x-1 px-3 py-1.5 bg-brand-red/10 border border-brand-red/20 hover:bg-brand-red/20 text-brand-red rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
+                        >
+                          <Trash2 size={12} />
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-10 text-center border border-dashed border-white/10 rounded-2xl text-gray-500">
+                <Bell size={28} className="mx-auto mb-2 opacity-30 text-brand-red" />
+                <p className="font-extrabold uppercase tracking-wider text-xs">No Broadcasts Active</p>
+                <p className="text-[10px] mt-0.5">Announcements published to student dashboards will show up here.</p>
+              </div>
+            )}
           </div>
         )}
 
