@@ -586,6 +586,40 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleResetAttendance = async () => {
+    if (!window.confirm(`Are you sure you want to reset and delete all attendance logs for ${attendanceDate}? This action cannot be undone.`)) return;
+    setSavingAttendance(true);
+    try {
+      const targetDojo = role === 'super_admin' ? (selectedDojoFilter || 'pattam') : (profile?.dojoId || 'pattam');
+      const q = query(
+        collection(db, 'attendance'),
+        where('dojoId', '==', targetDojo),
+        where('date', '==', attendanceDate)
+      );
+      const snap = await getDocs(q);
+      
+      if (snap.empty) {
+        alert("No attendance records found for this date and branch.");
+        return;
+      }
+
+      const batchPromises = snap.docs.map(docSnap => deleteDoc(doc(db, 'attendance', docSnap.id)));
+      await Promise.all(batchPromises);
+
+      setAttendanceRecords({});
+      alert(`Successfully reset all attendance records for ${attendanceDate}!`);
+      setActivityLogs(prev => [
+        { timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `Attendance reset for ${attendanceDate}`, user: role === 'super_admin' ? 'Super Admin' : 'Dojo Admin' },
+        ...prev
+      ]);
+    } catch (error) {
+      console.error("Failed to reset attendance:", error);
+      alert("Failed to reset attendance records.");
+    } finally {
+      setSavingAttendance(false);
+    }
+  };
+
   // Calculate dynamic stats
   const activeMembersCount = students.filter(s => s.role === 'student').length;
   
@@ -1604,20 +1638,30 @@ const AdminDashboard = () => {
                       />
                     </div>
 
-                    <button
-                      onClick={handleSaveAttendance}
-                      disabled={savingAttendance}
-                      className="w-full sm:w-auto px-6 py-3 bg-brand-red hover:bg-red-700 disabled:bg-gray-700 text-white font-bold text-xs uppercase tracking-widest rounded-xl transition-all shadow-md flex items-center justify-center space-x-2"
-                    >
-                      {savingAttendance ? (
-                        <span>Saving...</span>
-                      ) : (
-                        <>
-                          <Calendar size={14} />
-                          <span>Save Daily Logs</span>
-                        </>
-                      )}
-                    </button>
+                    <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                      <button
+                        onClick={handleResetAttendance}
+                        disabled={savingAttendance}
+                        className="w-full sm:w-auto px-6 py-3 bg-transparent border border-brand-red/35 hover:bg-brand-red/10 text-brand-red font-bold text-xs uppercase tracking-widest rounded-xl transition-all flex items-center justify-center space-x-2"
+                      >
+                        <Trash2 size={14} />
+                        <span>Reset Logs</span>
+                      </button>
+                      <button
+                        onClick={handleSaveAttendance}
+                        disabled={savingAttendance}
+                        className="w-full sm:w-auto px-6 py-3 bg-brand-red hover:bg-red-700 disabled:bg-gray-700 text-white font-bold text-xs uppercase tracking-widest rounded-xl transition-all shadow-md flex items-center justify-center space-x-2"
+                      >
+                        {savingAttendance ? (
+                          <span>Saving...</span>
+                        ) : (
+                          <>
+                            <Calendar size={14} />
+                            <span>Save Daily Logs</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="bg-brand-dark/50 border border-white/10 rounded-2xl overflow-hidden">
