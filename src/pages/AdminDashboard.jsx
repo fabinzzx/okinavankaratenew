@@ -41,7 +41,15 @@ const BELT_GRADES = [
 const AdminDashboard = () => {
   const { user, profile, role, logout } = useAuth();
   const navigate = useNavigate();
-  const [activeView, setActiveView] = useState('overview');
+  const [activeView, setActiveView] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get('view');
+    if (view === 'students' || view === 'roster' || view === 'directory') return 'roster';
+    if (view === 'attendance') return 'attendance';
+    if (view === 'grades') return 'grades';
+    if (view === 'admins') return 'admins';
+    return 'overview';
+  });
 
   const [darkMode, setDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -74,6 +82,31 @@ const AdminDashboard = () => {
   const [savingAttendance, setSavingAttendance] = useState(false);
   const [dojoLogs, setDojoLogs] = useState([]);
   const [isReportMode, setIsReportMode] = useState(false);
+  const [attendanceDojo, setAttendanceDojo] = useState(() => {
+    if (role === 'super_admin') return 'pattam';
+    if (profile?.dojoIds && profile.dojoIds.length > 0) return profile.dojoIds[0];
+    return profile?.dojoId || 'pattam';
+  });
+  const [reportStartDate, setReportStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  });
+  const [reportEndDate, setReportEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedStudentLogs, setSelectedStudentLogs] = useState(null);
+  const [isStudentLogsModalOpen, setIsStudentLogsModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (profile) {
+      if (role !== 'super_admin') {
+        if (profile.dojoIds && profile.dojoIds.length > 0) {
+          setAttendanceDojo(profile.dojoIds[0]);
+        } else {
+          setAttendanceDojo(profile.dojoId || 'pattam');
+        }
+      }
+    }
+  }, [profile, role]);
 
   // Form states for creating student / attendance / grades / fee / notifications
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
@@ -95,6 +128,11 @@ const AdminDashboard = () => {
   // Edit student modal
   const [editingStudent, setEditingStudent] = useState(null);
   const [editForm, setEditForm] = useState({});
+
+  // Quick fee update modal states
+  const [quickFeeStudent, setQuickFeeStudent] = useState(null);
+  const [quickFeeAmount, setQuickFeeAmount] = useState('');
+  const [isQuickFeeSaving, setIsQuickFeeSaving] = useState(false);
 
   // Edit admin modal states (super_admin only)
   const [editingAdmin, setEditingAdmin] = useState(null);
@@ -525,22 +563,53 @@ const AdminDashboard = () => {
     fetchStudents();
   }, [role, profile]);
 
+  // Handle direct quick-fee linking from URL parameter (?quickFee=studentId)
+  useEffect(() => {
+    if (students.length > 0) {
+      const params = new URLSearchParams(window.location.search);
+      const studentId = params.get('quickFee') || params.get('feeUpdate');
+      if (studentId) {
+        const student = students.find(s => s.id === studentId || s.uid === studentId);
+        if (student) {
+          handleOpenQuickFee(student);
+          // Clean only quick-fee parameters, preserving others (e.g. view)
+          params.delete('quickFee');
+          params.delete('feeUpdate');
+          const cleanUrl = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}${window.location.hash}`;
+          window.history.replaceState({}, document.title, cleanUrl);
+        }
+      }
+    }
+  }, [students]);
+
+  // Synchronize active view changes to URL search query parameter (?view=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const currentViewParam = params.get('view');
+    const targetParamVal = activeView === 'roster' ? 'students' : activeView;
+    if (currentViewParam !== targetParamVal) {
+      params.set('view', targetParamVal);
+      const newUrl = `${window.location.pathname}?${params.toString()}${window.location.hash}`;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, [activeView]);
+
   // Load attendance records for the selected date
   useEffect(() => {
     if (activeView === 'attendance') {
       const loadAttendance = async () => {
         try {
-          const targetDojo = role === 'super_admin' ? (selectedDojoFilter || 'pattam') : (profile?.dojoId || 'pattam');
           const q = query(
             collection(db, 'attendance'),
-            where('dojoId', '==', targetDojo),
             where('date', '==', attendanceDate)
           );
           const snap = await getDocs(q);
           const records = {};
           snap.docs.forEach(doc => {
             const data = doc.data();
-            records[data.uid] = data.status === 'Present';
+            if (data.dojoId === attendanceDojo) {
+              records[data.uid] = data.status === 'Present';
+            }
           });
           setAttendanceRecords(records);
         } catch (e) {
@@ -549,17 +618,16 @@ const AdminDashboard = () => {
       };
       loadAttendance();
     }
-  }, [activeView, attendanceDate, role, profile, selectedDojoFilter]);
+  }, [activeView, attendanceDate, role, profile, attendanceDojo]);
 
   // Load all logs for percentage calculation
   useEffect(() => {
     if (activeView === 'attendance') {
       const loadAllLogs = async () => {
         try {
-          const targetDojo = role === 'super_admin' ? (selectedDojoFilter || 'pattam') : (profile?.dojoId || 'pattam');
           const q = query(
             collection(db, 'attendance'),
-            where('dojoId', '==', targetDojo)
+            where('dojoId', '==', attendanceDojo)
           );
           const snap = await getDocs(q);
           setDojoLogs(snap.docs.map(d => d.data()));
@@ -569,13 +637,12 @@ const AdminDashboard = () => {
       };
       loadAllLogs();
     }
-  }, [activeView, savingAttendance, role, profile, selectedDojoFilter]);
+  }, [activeView, savingAttendance, role, profile, attendanceDojo]);
 
   const handleSaveAttendance = async () => {
     setSavingAttendance(true);
     try {
-      const targetDojo = role === 'super_admin' ? (selectedDojoFilter || 'pattam') : (profile?.dojoId || 'pattam');
-      const activeStudentsList = filteredStudents;
+      const activeStudentsList = attendanceStudentsList;
       
       for (const student of activeStudentsList) {
         const docId = `${student.id || student.uid}_${attendanceDate}`;
@@ -587,12 +654,20 @@ const AdminDashboard = () => {
           date: attendanceDate,
           session: "Regular Training",
           status: isPresent ? 'Present' : 'Absent',
-          dojoId: targetDojo,
+          dojoId: attendanceDojo,
           updatedAt: serverTimestamp()
         }, { merge: true });
       }
       
       alert(`Attendance for ${attendanceDate} successfully updated!`);
+      // Update dynamic calculation logs immediately
+      const q = query(
+        collection(db, 'attendance'),
+        where('dojoId', '==', attendanceDojo)
+      );
+      const snap = await getDocs(q);
+      setDojoLogs(snap.docs.map(d => d.data()));
+
       setActivityLogs(prev => [
         { timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `Attendance updated for ${attendanceDate}`, user: role === 'super_admin' ? 'Super Admin' : 'Dojo Admin' },
         ...prev
@@ -609,24 +684,31 @@ const AdminDashboard = () => {
     if (!window.confirm(`Are you sure you want to reset and delete all attendance logs for ${attendanceDate}? This action cannot be undone.`)) return;
     setSavingAttendance(true);
     try {
-      const targetDojo = role === 'super_admin' ? (selectedDojoFilter || 'pattam') : (profile?.dojoId || 'pattam');
       const q = query(
         collection(db, 'attendance'),
-        where('dojoId', '==', targetDojo),
         where('date', '==', attendanceDate)
       );
       const snap = await getDocs(q);
+      const docsToDelete = snap.docs.filter(d => d.data().dojoId === attendanceDojo);
       
-      if (snap.empty) {
+      if (docsToDelete.length === 0) {
         alert("No attendance records found for this date and branch.");
         return;
       }
 
-      const batchPromises = snap.docs.map(docSnap => deleteDoc(doc(db, 'attendance', docSnap.id)));
+      const batchPromises = docsToDelete.map(docSnap => deleteDoc(doc(db, 'attendance', docSnap.id)));
       await Promise.all(batchPromises);
 
       setAttendanceRecords({});
       alert(`Successfully reset all attendance records for ${attendanceDate}!`);
+      // Update dynamic calculation logs immediately
+      const q2 = query(
+        collection(db, 'attendance'),
+        where('dojoId', '==', attendanceDojo)
+      );
+      const snap2 = await getDocs(q2);
+      setDojoLogs(snap2.docs.map(d => d.data()));
+
       setActivityLogs(prev => [
         { timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `Attendance reset for ${attendanceDate}`, user: role === 'super_admin' ? 'Super Admin' : 'Dojo Admin' },
         ...prev
@@ -637,6 +719,89 @@ const AdminDashboard = () => {
     } finally {
       setSavingAttendance(false);
     }
+  };
+
+  const handleToggleStudentAttendanceSingle = async (studentId, studentName, date, currentStatus) => {
+    try {
+      const docId = `${studentId}_${date}`;
+      const newStatus = currentStatus === 'Present' ? 'Absent' : 'Present';
+      
+      await setDoc(doc(db, 'attendance', docId), {
+        uid: studentId,
+        studentName: studentName,
+        date: date,
+        session: "Regular Training",
+        status: newStatus,
+        dojoId: attendanceDojo,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      
+      // Update local dojoLogs state
+      setDojoLogs(prev => {
+        const exists = prev.some(log => log.uid === studentId && log.date === date);
+        if (exists) {
+          return prev.map(log => 
+            (log.uid === studentId && log.date === date) 
+              ? { ...log, status: newStatus } 
+              : log
+          );
+        } else {
+          return [...prev, {
+            uid: studentId,
+            studentName: studentName,
+            date: date,
+            session: "Regular Training",
+            status: newStatus,
+            dojoId: attendanceDojo
+          }];
+        }
+      });
+
+      // If the date is the current attendanceDate, sync attendanceRecords too
+      if (date === attendanceDate) {
+        setAttendanceRecords(prev => ({
+          ...prev,
+          [studentId]: newStatus === 'Present'
+        }));
+      }
+
+      // Update selectedStudentLogs state to reflect in UI immediately
+      setSelectedStudentLogs(prev => {
+        if (!prev) return prev;
+        const updatedDates = prev.dates.map(d => 
+          d.date === date ? { ...d, status: newStatus } : d
+        );
+        return { ...prev, dates: updatedDates };
+      });
+
+    } catch (e) {
+      console.error("Failed to update single attendance record:", e);
+      alert("Failed to update attendance record.");
+    }
+  };
+
+  const handleOpenStudentLogs = (student) => {
+    const studentId = student.id || student.uid;
+    
+    // Find all training dates in the selected range
+    const uniqueDates = Array.from(new Set(dojoLogs.map(log => log.date)))
+      .filter(date => date >= reportStartDate && date <= reportEndDate)
+      .sort((a, b) => new Date(b) - new Date(a));
+
+    const studentLogsForDates = uniqueDates.map(date => {
+      const log = dojoLogs.find(l => l.uid === studentId && l.date === date);
+      return {
+        date,
+        status: log ? log.status : 'Absent'
+      };
+    });
+
+    setSelectedStudentLogs({
+      studentId,
+      studentName: student.fullName,
+      dates: studentLogsForDates
+    });
+    setIsStudentLogsModalOpen(true);
   };
 
   // Calculate dynamic stats
@@ -650,11 +815,11 @@ const AdminDashboard = () => {
     : 0;
 
   // Calculate black belts
-  const blackBeltsCount = students.filter(s => s.beltGrade && s.beltGrade.toLowerCase().includes('black')).length;
+  const blackBeltsCount = students.filter(s => s.role === 'student' && s.beltGrade && s.beltGrade.toLowerCase().includes('black')).length;
 
   // Calculate monthly income
-  const paidStudentsCount = students.filter(s => s.feesStatus && s.feesStatus.toLowerCase() === 'paid').length;
-  const totalMonthlyIncome = paidStudentsCount * 1000; // standard fee ₹1000/month
+  const paidStudentsCount = students.filter(s => s.role === 'student' && s.feesStatus && s.feesStatus.toLowerCase() === 'paid').length;
+  const totalMonthlyIncome = paidStudentsCount * 500; // standard fee ₹500/month
   const formattedIncome = totalMonthlyIncome >= 100000 
     ? `₹${(totalMonthlyIncome / 100000).toFixed(2)}L` 
     : `₹${totalMonthlyIncome.toLocaleString('en-IN')}`;
@@ -676,6 +841,18 @@ const AdminDashboard = () => {
                           email.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesDojo = !selectedDojoFilter || student.dojoId === selectedDojoFilter;
     return matchesSearch && matchesDojo;
+  });
+
+  const attendanceStudentsList = students.filter(s => {
+    if (s.role !== 'student') return false;
+    return s.dojoId === attendanceDojo;
+  });
+
+  const filteredAttendanceStudents = attendanceStudentsList.filter(student => {
+    const fullName = student.fullName || '';
+    const email = student.email || '';
+    return fullName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+           email.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   const handleCreateAdmin = async (e) => {
@@ -825,6 +1002,7 @@ const AdminDashboard = () => {
     setEditingStudent(student);
     setEditForm({
       fullName: student.fullName || '',
+      email: student.email || '',
       mobileNumber: student.mobileNumber || '',
       dojoId: student.dojoId || '',
       beltGrade: student.beltGrade || 'White Belt',
@@ -849,6 +1027,7 @@ const AdminDashboard = () => {
       
       const updateData = {
         fullName: editForm.fullName,
+        email: editForm.email.trim().toLowerCase(),
         mobileNumber: editForm.mobileNumber,
         dojoId: editForm.dojoId,
         beltGrade: editForm.beltGrade,
@@ -908,6 +1087,54 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error(error);
       alert('Failed to update profile: ' + error.message);
+    }
+  };
+
+  const handleOpenQuickFee = (student) => {
+    setQuickFeeStudent(student);
+    setQuickFeeAmount(student.pendingFees || '0');
+  };
+
+  const handleSaveQuickFee = async (e) => {
+    e.preventDefault();
+    if (!quickFeeStudent) return;
+    setIsQuickFeeSaving(true);
+    try {
+      const studentId = quickFeeStudent.id || quickFeeStudent.uid;
+      const studentRef = doc(db, 'users', studentId);
+      const newFees = quickFeeAmount || '0';
+      const newStatus = Number(newFees) > 0 ? 'pending' : 'paid';
+
+      // Log fee collection if setting to 0 from > 0
+      if (Number(newFees) === 0 && Number(quickFeeStudent.pendingFees || 0) > 0) {
+        const feeRef = doc(collection(db, 'fees'));
+        await setDoc(feeRef, {
+          uid: studentId,
+          amount: `₹${quickFeeStudent.pendingFees}`,
+          date: new Date().toISOString().split('T')[0],
+          createdAt: serverTimestamp()
+        });
+      }
+
+      await updateDoc(studentRef, {
+        pendingFees: newFees,
+        feesStatus: newStatus
+      });
+
+      // Update local state
+      setStudents(prev => prev.map(s => 
+        (s.id === studentId || s.uid === studentId) 
+          ? { ...s, pendingFees: newFees, feesStatus: newStatus } 
+          : s
+      ));
+
+      setQuickFeeStudent(null);
+      alert('Fees updated successfully!');
+    } catch (error) {
+      console.error("Error updating fees:", error);
+      alert("Failed to update fees.");
+    } finally {
+      setIsQuickFeeSaving(false);
     }
   };
 
@@ -1078,11 +1305,11 @@ const AdminDashboard = () => {
   const chartData = role === 'super_admin' 
     ? branches.map(b => ({
         name: b.name,
-        Students: students.filter(s => s.dojoId === b.id).length
+        Students: students.filter(s => s.role === 'student' && s.dojoId === b.id).length
       }))
     : branches.filter(b => b.id === (profile?.dojoId || 'pattam')).map(b => ({
         name: b.name,
-        Students: students.filter(s => s.dojoId === b.id).length
+        Students: students.filter(s => s.role === 'student' && s.dojoId === b.id).length
       }));
 
   // Dynamic Belt Grade Distribution calculations
@@ -1378,8 +1605,22 @@ const AdminDashboard = () => {
                         <p className="text-brand-dark dark:text-white font-extrabold text-sm">{student.fullName}</p>
                         <p className="text-[10px] text-gray-500">{student.email}</p>
                         <p className="text-xs text-gray-400 mt-0.5">{student.mobileNumber}</p>
+                        <div className="mt-1">
+                          {Number(student.pendingFees || 0) > 0 ? (
+                            <span className="text-[9px] bg-brand-red/10 text-brand-red px-1.5 py-0.5 rounded font-black uppercase tracking-wider">₹{student.pendingFees} Due</span>
+                          ) : (
+                            <span className="text-[9px] bg-emerald-500/10 text-emerald-500 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">Paid</span>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center space-x-1 shrink-0">
+                        <button
+                          onClick={() => handleOpenQuickFee(student)}
+                          className="p-2 dark:bg-white/5 bg-brand-dark/5 hover:bg-brand-dark/10 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-emerald-500 rounded-xl transition-all"
+                          title="Quick Fee Update"
+                        >
+                          <CreditCard size={14} />
+                        </button>
                         <button
                           onClick={() => handleOpenEdit(student)}
                           className="p-2 dark:bg-white/5 bg-brand-dark/5 hover:bg-brand-dark/10 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-brand-gold rounded-xl transition-all"
@@ -1425,9 +1666,16 @@ const AdminDashboard = () => {
                     {filteredStudents.map((student) => (
                       <tr key={student.id} className="hover:bg-brand-dark/5 dark:hover:bg-white/5">
                         <td className="p-4">
-                          <div>
+                          <div className="space-y-1">
                             <p className="text-brand-dark dark:text-white font-extrabold text-sm">{student.fullName}</p>
                             <p className="text-[10px] text-gray-500 font-semibold">{student.email}</p>
+                            <div>
+                              {Number(student.pendingFees || 0) > 0 ? (
+                                <span className="text-[9px] bg-brand-red/10 text-brand-red px-1.5 py-0.5 rounded font-black uppercase tracking-wider">₹{student.pendingFees} Due</span>
+                              ) : (
+                                <span className="text-[9px] bg-emerald-500/10 text-emerald-500 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">Paid</span>
+                              )}
+                            </div>
                           </div>
                         </td>
                         <td className="p-4">{student.mobileNumber}</td>
@@ -1439,6 +1687,13 @@ const AdminDashboard = () => {
                         </td>
                         <td className="p-4 text-right">
                           <div className="flex items-center justify-end space-x-2">
+                            <button
+                              onClick={() => handleOpenQuickFee(student)}
+                              className="p-2 hover:bg-brand-dark/5 dark:hover:bg-white/5 text-gray-500 dark:text-gray-400 hover:text-emerald-500 rounded-xl transition-all"
+                              title="Quick Fee Update"
+                            >
+                              <CreditCard size={14} />
+                            </button>
                             <button
                               onClick={() => handleOpenEdit(student)}
                               className="p-2 hover:bg-brand-dark/5 dark:hover:bg-white/5 text-gray-500 dark:text-gray-400 hover:text-brand-gold rounded-xl transition-all"
@@ -1658,18 +1913,59 @@ const AdminDashboard = () => {
               // Mark Daily Attendance View
               <div className="space-y-6">
                 <div className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl">
-                  <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-                    <div className="space-y-1.5 w-full sm:w-auto">
-                      <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Select Session Date</label>
-                      <input
-                        type="date"
-                        value={attendanceDate}
-                        onChange={(e) => setAttendanceDate(e.target.value)}
-                        className="dark:bg-brand-dark bg-white border border-brand-dark/15 dark:border-white/15 rounded-xl px-4 py-2.5 text-sm dark:text-white text-brand-dark focus:outline-none focus:border-brand-red/50 w-full sm:w-64"
-                      />
+                  <div className="flex flex-col xl:flex-row gap-4 items-center justify-between">
+                    <div className="flex flex-col sm:flex-row gap-4 items-center w-full xl:w-auto">
+                      <div className="space-y-1.5 w-full sm:w-auto">
+                        <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Select Session Date</label>
+                        <input
+                          type="date"
+                          value={attendanceDate}
+                          onChange={(e) => setAttendanceDate(e.target.value)}
+                          className="dark:bg-brand-dark bg-white border border-brand-dark/15 dark:border-white/15 rounded-xl px-4 py-2.5 text-sm dark:text-white text-brand-dark focus:outline-none focus:border-brand-red/50 w-full sm:w-64"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5 w-full sm:w-auto">
+                        <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Dojo Branch</label>
+                        {role === 'super_admin' ? (
+                          <select
+                            value={attendanceDojo}
+                            onChange={(e) => setAttendanceDojo(e.target.value)}
+                            className="bg-white dark:bg-brand-dark/50 border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand-red/50 text-brand-dark dark:text-gray-300 w-full sm:w-64"
+                          >
+                            {DOJO_LIST.map(dojo => (
+                              <option key={dojo.id} value={dojo.id}>{dojo.name}</option>
+                            ))}
+                          </select>
+                        ) : (() => {
+                          const adminDojos = profile?.dojoIds?.length > 0
+                            ? DOJO_LIST.filter(d => profile.dojoIds.includes(d.id))
+                            : DOJO_LIST.filter(d => d.id === (profile?.dojoId || 'pattam'));
+                          
+                          if (adminDojos.length <= 1) {
+                            return (
+                              <div className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-brand-dark dark:text-gray-300 w-full sm:w-64 h-11 flex items-center">
+                                <span className="font-extrabold uppercase">{adminDojos[0]?.name || 'Pattam Dojo'}</span>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <select
+                              value={attendanceDojo}
+                              onChange={(e) => setAttendanceDojo(e.target.value)}
+                              className="bg-white dark:bg-brand-dark/50 border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand-red/50 text-brand-dark dark:text-gray-300 w-full sm:w-64"
+                            >
+                              {adminDojos.map(dojo => (
+                                <option key={dojo.id} value={dojo.id}>{dojo.name}</option>
+                              ))}
+                            </select>
+                          );
+                        })()}
+                      </div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto xl:self-end">
                       <button
                         onClick={handleResetAttendance}
                         disabled={savingAttendance}
@@ -1706,7 +2002,7 @@ const AdminDashboard = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y dark:divide-white/5 divide-brand-dark/10 font-semibold text-xs sm:text-sm dark:text-gray-300 text-brand-dark">
-                        {filteredStudents.map((student) => {
+                        {filteredAttendanceStudents.map((student) => {
                           const studentId = student.id || student.uid;
                           const isPresent = attendanceRecords[studentId] || false;
                           return (
@@ -1745,11 +2041,69 @@ const AdminDashboard = () => {
               // Attendance Report / Roster Calculation & PDF View
               <div className="space-y-6">
                 <div className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl">
-                  <div className="flex justify-between items-center no-print">
-                    <h3 className="dark:text-white text-brand-dark font-extrabold text-sm uppercase tracking-wider">Attendance Report & Calculations</h3>
+                  <div className="flex flex-col xl:flex-row gap-4 items-center justify-between no-print">
+                    <div className="flex flex-col sm:flex-row gap-4 items-center w-full xl:w-auto">
+                      <div className="space-y-1.5 w-full sm:w-auto">
+                        <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Start Date</label>
+                        <input
+                          type="date"
+                          value={reportStartDate}
+                          onChange={(e) => setReportStartDate(e.target.value)}
+                          className="dark:bg-brand-dark bg-white border border-brand-dark/15 dark:border-white/15 rounded-xl px-4 py-2 text-xs dark:text-white text-brand-dark focus:outline-none focus:border-brand-red/50 w-full sm:w-44"
+                        />
+                      </div>
+                      <div className="space-y-1.5 w-full sm:w-auto">
+                        <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">End Date</label>
+                        <input
+                          type="date"
+                          value={reportEndDate}
+                          onChange={(e) => setReportEndDate(e.target.value)}
+                          className="dark:bg-brand-dark bg-white border border-brand-dark/15 dark:border-white/15 rounded-xl px-4 py-2 text-xs dark:text-white text-brand-dark focus:outline-none focus:border-brand-red/50 w-full sm:w-44"
+                        />
+                      </div>
+                      <div className="space-y-1.5 w-full sm:w-auto">
+                        <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Dojo Branch</label>
+                        {role === 'super_admin' ? (
+                          <select
+                            value={attendanceDojo}
+                            onChange={(e) => setAttendanceDojo(e.target.value)}
+                            className="bg-white dark:bg-brand-dark/50 border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-brand-red/50 text-brand-dark dark:text-gray-300 w-full sm:w-48"
+                          >
+                            {DOJO_LIST.map(dojo => (
+                              <option key={dojo.id} value={dojo.id}>{dojo.name}</option>
+                            ))}
+                          </select>
+                        ) : (() => {
+                          const adminDojos = profile?.dojoIds?.length > 0
+                            ? DOJO_LIST.filter(d => profile.dojoIds.includes(d.id))
+                            : DOJO_LIST.filter(d => d.id === (profile?.dojoId || 'pattam'));
+                          
+                          if (adminDojos.length <= 1) {
+                            return (
+                              <div className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-xl px-4 py-2 text-xs text-brand-dark dark:text-gray-300 w-full sm:w-48 h-9 flex items-center">
+                                <span className="font-extrabold uppercase">{adminDojos[0]?.name || 'Pattam Dojo'}</span>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <select
+                              value={attendanceDojo}
+                              onChange={(e) => setAttendanceDojo(e.target.value)}
+                              className="bg-white dark:bg-brand-dark/50 border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-brand-red/50 text-brand-dark dark:text-gray-300 w-full sm:w-48"
+                            >
+                              {adminDojos.map(dojo => (
+                                <option key={dojo.id} value={dojo.id}>{dojo.name}</option>
+                              ))}
+                            </select>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
                     <button
                       onClick={() => window.print()}
-                      className="px-6 py-3 bg-brand-gold text-brand-dark font-bold text-xs uppercase tracking-widest rounded-xl transition-all shadow-md flex items-center justify-center space-x-1.5"
+                      className="w-full xl:w-auto px-6 py-3 bg-brand-gold text-brand-dark font-bold text-xs uppercase tracking-widest rounded-xl transition-all shadow-md flex items-center justify-center space-x-1.5 xl:self-end"
                     >
                       <Download size={14} />
                       <span>Print PDF Report</span>
@@ -1760,7 +2114,11 @@ const AdminDashboard = () => {
                     <div className="hidden print:block text-center space-y-2 pb-6 border-b border-gray-200">
                       <h2 className="text-2xl font-black uppercase text-black">Okinavan Shito Ryu Karate Academy</h2>
                       <p className="text-sm font-bold uppercase tracking-widest text-gray-600">Official Dojo Attendance Roster Report</p>
-                      <p className="text-xs text-gray-500">Dojo Branch: {role === 'super_admin' ? (selectedDojoFilter || 'Pattam') : (profile?.dojoId || 'Pattam')} | Generated: {new Date().toLocaleDateString()}</p>
+                      <p className="text-xs text-gray-500">
+                        Dojo Branch: {DOJO_LIST.find(d => d.id === attendanceDojo)?.name || attendanceDojo} | 
+                        Period: {reportStartDate} to {reportEndDate} | 
+                        Generated: {new Date().toLocaleDateString()}
+                      </p>
                     </div>
 
                     <table className="w-full text-left text-sm print:text-black">
@@ -1770,12 +2128,13 @@ const AdminDashboard = () => {
                           <th className="p-4 text-center">Total Sessions</th>
                           <th className="p-4 text-center">Sessions Present</th>
                           <th className="p-4 text-right">Attendance %</th>
+                          <th className="p-4 text-right no-print hidden md:table-cell">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y dark:divide-white/5 divide-brand-dark/10 print:divide-gray-200 font-semibold text-xs sm:text-sm dark:text-gray-300 text-brand-dark print:text-black">
-                        {filteredStudents.map((student) => {
+                        {filteredAttendanceStudents.map((student) => {
                           const studentId = student.id || student.uid;
-                          const studentLogs = dojoLogs.filter(log => log.uid === studentId);
+                          const studentLogs = dojoLogs.filter(log => log.uid === studentId && log.date >= reportStartDate && log.date <= reportEndDate);
                           const total = studentLogs.length;
                           const present = studentLogs.filter(log => log.status === 'Present').length;
                           const percent = total > 0 ? ((present / total) * 100).toFixed(1) : '100.0';
@@ -1783,11 +2142,25 @@ const AdminDashboard = () => {
                             <tr key={studentId} className="hover:bg-brand-dark/5 dark:hover:bg-white/5 print:hover:bg-transparent">
                               <td className="p-4">
                                 <p className="dark:text-white text-brand-dark print:text-black font-extrabold">{student.fullName}</p>
-                                <p className="text-[10px] text-gray-500 print:text-gray-600 font-semibold">{student.email}</p>
+                                <p className="text-[10px] text-gray-500 print:text-gray-600 font-semibold hidden md:block print:block">{student.email}</p>
+                                <button
+                                  onClick={() => handleOpenStudentLogs(student)}
+                                  className="text-brand-red hover:text-red-700 text-[10px] font-black uppercase tracking-wider md:hidden mt-1 block no-print cursor-pointer"
+                                >
+                                  View Logs
+                                </button>
                               </td>
                               <td className="p-4 text-center font-mono dark:text-gray-400 text-gray-600 print:text-gray-700">{total}</td>
                               <td className="p-4 text-center font-mono text-emerald-600 dark:text-emerald-400 print:text-emerald-700">{present}</td>
                               <td className="p-4 text-right font-black text-brand-gold print:text-amber-800">{percent}%</td>
+                              <td className="p-4 text-right no-print hidden md:table-cell">
+                                <button
+                                  onClick={() => handleOpenStudentLogs(student)}
+                                  className="px-3 py-1.5 bg-brand-red hover:bg-red-700 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer"
+                                >
+                                  View Logs
+                                </button>
+                              </td>
                             </tr>
                           );
                         })}
@@ -2498,6 +2871,17 @@ const AdminDashboard = () => {
                   </div>
 
                   <div className="space-y-1.5">
+                    <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Email Address</label>
+                    <input
+                      type="email"
+                      required
+                      value={editForm.email}
+                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                      className="w-full dark:bg-brand-dark/50 bg-white border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white text-brand-dark focus:outline-none focus:border-brand-gold/50"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 sm:col-span-2">
                     <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Mobile Number</label>
                     <input
                       type="tel"
@@ -2611,6 +2995,72 @@ const AdminDashboard = () => {
         )}
       </AnimatePresence>
 
+      {/* Quick Fee Update Modal */}
+      <AnimatePresence>
+        {quickFeeStudent && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="dark:bg-brand-dark bg-white border border-brand-dark/10 dark:border-white/10 rounded-3xl p-8 w-full max-w-md shadow-2xl space-y-6"
+            >
+              <div>
+                <div className="flex items-center space-x-3 mb-1">
+                  <CreditCard size={20} className="text-emerald-500 animate-bounce" />
+                  <h2 className="text-xl font-black uppercase dark:text-white text-brand-dark tracking-wide">Quick Fee Update</h2>
+                </div>
+                <p className="text-xs dark:text-gray-400 text-gray-600">Student: <span className="dark:text-white text-brand-dark font-bold">{quickFeeStudent.fullName}</span></p>
+                <p className="text-[10px] text-gray-500 font-semibold">{quickFeeStudent.email}</p>
+              </div>
+
+              <form onSubmit={handleSaveQuickFee} className="space-y-5">
+                <div className="space-y-2">
+                  <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Pending Fees (₹)</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      required
+                      value={quickFeeAmount}
+                      onChange={(e) => setQuickFeeAmount(e.target.value)}
+                      className="w-full dark:bg-brand-dark/50 bg-white border border-brand-dark/15 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white text-brand-dark focus:outline-none focus:border-emerald-500/50"
+                      placeholder="e.g. 500"
+                    />
+                    {Number(quickFeeAmount || 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setQuickFeeAmount('0')}
+                        className="px-4 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all shadow-md shrink-0"
+                      >
+                        Set Paid
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-3 pt-2">
+                  <button
+                    type="submit"
+                    disabled={isQuickFeeSaving}
+                    className="flex-grow py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase tracking-wider rounded-xl transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
+                  >
+                    {isQuickFeeSaving ? <Loader2 size={14} className="animate-spin" /> : <CreditCard size={14} />}
+                    <span>Save Fees</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuickFeeStudent(null)}
+                    className="px-6 py-3.5 border border-brand-dark/20 dark:border-white/20 dark:hover:bg-white/5 hover:bg-brand-dark/5 text-gray-600 dark:text-gray-300 rounded-xl transition-all"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Edit Admin Modal — super_admin only */}
       <AnimatePresence>
         {editingAdmin && (
@@ -2688,6 +3138,75 @@ const AdminDashboard = () => {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Detailed Student Attendance Logs Modal */}
+      <AnimatePresence>
+        {isStudentLogsModalOpen && selectedStudentLogs && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="dark:bg-brand-dark bg-white border border-brand-dark/10 dark:border-white/10 rounded-3xl p-6 sm:p-8 w-full max-w-md shadow-2xl space-y-6 max-h-[85vh] flex flex-col"
+            >
+              <div>
+                <div className="flex items-center space-x-3 mb-1">
+                  <Calendar size={20} className="text-brand-gold" />
+                  <h2 className="text-lg sm:text-xl font-black uppercase dark:text-white text-brand-dark tracking-wide">Attendance Logs</h2>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Student: <span className="dark:text-white text-brand-dark font-extrabold">{selectedStudentLogs.studentName}</span>
+                </p>
+                <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+                  Period: {reportStartDate} to {reportEndDate}
+                </p>
+                <p className="text-[9px] text-brand-gold font-bold uppercase tracking-wider mt-1.5 animate-pulse">
+                  💡 Click any status badge below to toggle Present/Absent
+                </p>
+              </div>
+
+              <div className="flex-grow overflow-y-auto pr-1 space-y-3 dark:bg-brand-dark/50 bg-brand-light/50 border border-brand-dark/10 dark:border-white/5 rounded-2xl p-4">
+                {selectedStudentLogs.dates.length > 0 ? (
+                  selectedStudentLogs.dates.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between py-2 border-b last:border-0 dark:border-white/5 border-brand-dark/10">
+                      <span className="text-xs font-bold text-gray-600 dark:text-gray-400">{item.date}</span>
+                      <button
+                        onClick={() => handleToggleStudentAttendanceSingle(
+                          selectedStudentLogs.studentId,
+                          selectedStudentLogs.studentName,
+                          item.date,
+                          item.status
+                        )}
+                        className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-all border ${
+                          item.status === 'Present'
+                            ? 'bg-emerald-500/10 border-emerald-500/35 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20'
+                            : 'bg-brand-red/10 border-brand-red/35 text-brand-red hover:bg-brand-red/20'
+                        }`}
+                      >
+                        {item.status}
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-gray-500 text-xs font-semibold">
+                    No sessions logged in this period.
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={() => {
+                  setIsStudentLogsModalOpen(false);
+                  setSelectedStudentLogs(null);
+                }}
+                className="w-full py-3 bg-brand-red hover:bg-red-700 text-white font-black uppercase tracking-wider rounded-xl transition-all text-xs"
+              >
+                Close Logs
+              </button>
             </motion.div>
           </div>
         )}

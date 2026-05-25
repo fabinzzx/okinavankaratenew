@@ -121,6 +121,49 @@ export const AuthProvider = ({ children }) => {
               profilePhotoUrl: existingData.profilePhotoUrl || u.photoURL || '',
               isOnboarded: existingData.isOnboarded !== undefined ? existingData.isOnboarded : true,
             });
+            
+            // Migrate related records: attendance, exams, fees, documents
+            try {
+              const oldId = existingDoc.id;
+              const newId = u.uid;
+              
+              // 1. Attendance
+              const attQuery = query(collection(db, 'attendance'), where('uid', '==', oldId));
+              const attSnap = await getDocs(attQuery);
+              for (const d of attSnap.docs) {
+                const attData = d.data();
+                const newAttDocId = `${newId}_${attData.date}`;
+                await setDoc(doc(db, 'attendance', newAttDocId), {
+                  ...attData,
+                  uid: newId
+                });
+                await deleteDoc(doc(db, 'attendance', d.id));
+              }
+
+              // 2. Exams
+              const examQuery = query(collection(db, 'exams'), where('uid', '==', oldId));
+              const examSnap = await getDocs(examQuery);
+              for (const d of examSnap.docs) {
+                await setDoc(doc(db, 'exams', d.id), { uid: newId }, { merge: true });
+              }
+
+              // 3. Fees
+              const feeQuery = query(collection(db, 'fees'), where('uid', '==', oldId));
+              const feeSnap = await getDocs(feeQuery);
+              for (const d of feeSnap.docs) {
+                await setDoc(doc(db, 'fees', d.id), { uid: newId }, { merge: true });
+              }
+
+              // 4. Documents
+              const docQuery = query(collection(db, 'documents'), where('ownerId', '==', oldId));
+              const docSnap = await getDocs(docQuery);
+              for (const d of docSnap.docs) {
+                await setDoc(doc(db, 'documents', d.id), { ownerId: newId }, { merge: true });
+              }
+            } catch (migErr) {
+              console.error("Failed to migrate related student records:", migErr);
+            }
+
             // Delete old random/temporary document
             try {
               await deleteDoc(doc(db, 'users', existingDoc.id));
@@ -208,7 +251,19 @@ export const AuthProvider = ({ children }) => {
               }
 
               // Filter for student profiles
-              const studentProfiles = docs.filter(d => d.role === 'student');
+              let studentProfiles = docs.filter(d => d.role === 'student');
+
+              // Deduplicate in-memory if an official Google UID document exists
+              const officialStudentProfile = studentProfiles.find(p => p.id === currentUser.uid);
+              if (officialStudentProfile) {
+                studentProfiles = studentProfiles.filter(p => {
+                  if (p.id === currentUser.uid) return true;
+                  // If it's a different doc ID but has same email and same name (case-insensitive), it's a duplicate
+                  const isDuplicate = p.email?.trim().toLowerCase() === officialStudentProfile.email?.trim().toLowerCase() && 
+                                      p.fullName?.trim().toLowerCase() === officialStudentProfile.fullName?.trim().toLowerCase();
+                  return !isDuplicate;
+                });
+              }
 
               if (studentProfiles.length > 0) {
                 setRole('student');

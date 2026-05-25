@@ -12,6 +12,10 @@
 }
 
 @layer base {
+  html.dark {
+    color-scheme: dark;
+  }
+
   body {
     background-color: var(--color-brand-light);
     color: #1F2937;

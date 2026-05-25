@@ -43,6 +43,12 @@ const StudentDashboard = () => {
   const [exams, setExams] = useState([]);
   const [fees, setFees] = useState([]);
   const [tournaments, setTournaments] = useState([]);
+  const [reportStartDate, setReportStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  });
+  const [reportEndDate, setReportEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [notifications, setNotifications] = useState([]);
 
   // Cloudinary Wallet Documents State
@@ -626,51 +632,170 @@ const StudentDashboard = () => {
             )}
 
             {/* 3. ATTENDANCE TAB */}
-            {activeTab === 'attendance' && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-black uppercase text-brand-dark dark:text-white tracking-wide mb-2">My Attendance Logs</h2>
-                  <div className="h-1 w-12 bg-brand-red mb-6" />
-                </div>
+            {activeTab === 'attendance' && (() => {
+              // Filter and sort logs in selected date range
+              const rangeLogs = attendance
+                .filter(log => log.date >= reportStartDate && log.date <= reportEndDate)
+                .sort((a, b) => new Date(b.date) - new Date(a.date));
 
-                {attendance.length > 0 ? (
-                  <div className="bg-brand-dark/5 dark:bg-brand-dark/50 border border-brand-dark/10 dark:border-white/5 rounded-2xl overflow-hidden">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-brand-dark/10 dark:bg-brand-dark border-b border-brand-dark/10 dark:border-white/10 text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider font-bold">
-                        <tr>
-                          <th className="p-4">Date</th>
-                          <th className="p-4">Dojo Session</th>
-                          <th className="p-4 text-right">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-brand-dark/10 dark:divide-white/5 font-semibold text-xs sm:text-sm text-brand-dark dark:text-gray-300">
-                        {attendance.map((att, idx) => (
-                          <tr key={idx} className="hover:bg-brand-dark/5 dark:hover:bg-white/5">
-                            <td className="p-4 text-gray-500 dark:text-gray-400">{att.date}</td>
-                            <td className="p-4 text-brand-dark dark:text-white">{att.session}</td>
-                            <td className="p-4 text-right">
-                              <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                att.status?.toLowerCase() === 'present' 
-                                  ? 'bg-green-500/10 text-green-500 border border-green-500/20' 
-                                  : 'bg-brand-red/10 text-brand-red border border-brand-red/20'
-                              }`}>
-                                {att.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+              const totalSessions = rangeLogs.length;
+              const presentDays = rangeLogs.filter(l => l.status?.toLowerCase() === 'present').length;
+              const absentDays = rangeLogs.filter(l => l.status?.toLowerCase() === 'absent').length;
+              const attendanceRate = totalSessions > 0 
+                ? ((presentDays / totalSessions) * 100).toFixed(1)
+                : '100.0';
+
+              return (
+                <div className="space-y-6">
+                  <style>{`
+                    @media print {
+                      body * {
+                        visibility: hidden;
+                      }
+                      #printable-student-attendance, #printable-student-attendance * {
+                        visibility: visible;
+                      }
+                      #printable-student-attendance {
+                        position: absolute;
+                        left: 0;
+                        top: 0;
+                        width: 100%;
+                        color: black !important;
+                        background: white !important;
+                      }
+                      .no-print {
+                        display: none !important;
+                      }
+                    }
+                  `}</style>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-print">
+                    <div>
+                      <h2 className="text-xl sm:text-2xl font-black uppercase text-brand-dark dark:text-white tracking-wide mb-2">My Attendance Logs</h2>
+                      <div className="h-1 w-12 bg-brand-red mb-4" />
+                    </div>
+
+                    <button
+                      onClick={() => window.print()}
+                      className="px-5 py-2.5 bg-brand-gold text-brand-dark font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center justify-center space-x-1.5 self-start sm:self-center"
+                    >
+                      <Download size={14} />
+                      <span>Download Report</span>
+                    </button>
                   </div>
-                ) : (
-                  <div className="p-12 text-center border border-dashed border-brand-dark/10 dark:border-white/10 rounded-3xl text-gray-500 dark:text-gray-400 text-sm">
-                    <Calendar size={36} className="mx-auto mb-3 opacity-40 text-brand-red" />
-                    <p className="font-bold uppercase tracking-wider mb-1">No Attendance Logged</p>
-                    <p className="text-xs">Your physical attendances are scanned and updated by Dojo Instructors.</p>
+
+                  {/* Date Range Selector (no-print) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-2xl p-4 no-print">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Start Date</label>
+                      <input
+                        type="date"
+                        value={reportStartDate}
+                        onChange={(e) => setReportStartDate(e.target.value)}
+                        className="w-full dark:bg-brand-dark bg-white border border-brand-dark/15 dark:border-white/15 rounded-xl px-4 py-2 text-xs dark:text-white text-brand-dark focus:outline-none focus:border-brand-red/50"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">End Date</label>
+                      <input
+                        type="date"
+                        value={reportEndDate}
+                        onChange={(e) => setReportEndDate(e.target.value)}
+                        className="w-full dark:bg-brand-dark bg-white border border-brand-dark/15 dark:border-white/15 rounded-xl px-4 py-2 text-xs dark:text-white text-brand-dark focus:outline-none focus:border-brand-red/50"
+                      />
+                    </div>
                   </div>
-                )}
-              </div>
-            )}
+
+                  {/* Stats Cards (no-print) */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 no-print">
+                    <div className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-2xl p-4 text-center">
+                      <p className="text-xl font-extrabold dark:text-white text-brand-dark">{totalSessions}</p>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold mt-1">Total Sessions</p>
+                    </div>
+                    <div className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-2xl p-4 text-center">
+                      <p className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400">{presentDays}</p>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold mt-1">Days Present</p>
+                    </div>
+                    <div className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-2xl p-4 text-center">
+                      <p className="text-xl font-extrabold text-brand-red">{absentDays}</p>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold mt-1">Days Absent</p>
+                    </div>
+                    <div className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-2xl p-4 text-center">
+                      <p className="text-xl font-extrabold text-brand-gold">{attendanceRate}%</p>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold mt-1">Attendance Rate</p>
+                    </div>
+                  </div>
+
+                  {/* Printable & UI Log area */}
+                  <div id="printable-student-attendance" className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-3xl overflow-hidden shadow-xl p-4 sm:p-6 print:border-0 print:bg-white print:text-black">
+                    {/* Header strictly for printing */}
+                    <div className="hidden print:block text-center space-y-2 pb-6 border-b border-gray-200 mb-6">
+                      <h2 className="text-2xl font-black uppercase text-black">Okinavan Shito Ryu Karate Academy</h2>
+                      <p className="text-sm font-bold uppercase tracking-widest text-gray-600">Student Attendance Report</p>
+                      <div className="text-xs text-gray-500 space-y-1">
+                        <p>Student Name: <span className="font-bold text-black">{profile.fullName}</span> | Email: {profile.email}</p>
+                        <p>Period: {reportStartDate} to {reportEndDate} | Generated: {new Date().toLocaleDateString()}</p>
+                      </div>
+                      <div className="grid grid-cols-4 gap-2 pt-4 border-t border-gray-100 text-center font-bold">
+                        <div>
+                          <p className="text-sm text-black">{totalSessions}</p>
+                          <p className="text-[8px] text-gray-500 uppercase">Sessions</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-emerald-600">{presentDays}</p>
+                          <p className="text-[8px] text-gray-500 uppercase">Present</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-red-600">{absentDays}</p>
+                          <p className="text-[8px] text-gray-500 uppercase">Absent</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-amber-800">{attendanceRate}%</p>
+                          <p className="text-[8px] text-gray-500 uppercase">Rate</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {rangeLogs.length > 0 ? (
+                      <div className="dark:bg-brand-dark/50 bg-brand-light/50 border border-brand-dark/10 dark:border-white/5 rounded-2xl overflow-hidden print:border-gray-200">
+                        <table className="w-full text-left text-sm print:text-black">
+                          <thead className="bg-brand-dark/10 dark:bg-brand-dark print:bg-gray-100 border-b border-brand-dark/10 dark:border-white/10 print:border-gray-200 text-gray-500 dark:text-gray-400 print:text-gray-700 text-xs uppercase tracking-wider font-bold">
+                            <tr>
+                              <th className="p-4">Date</th>
+                              <th className="p-4">Dojo Session</th>
+                              <th className="p-4 text-right">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-brand-dark/10 dark:divide-white/5 print:divide-gray-200 font-semibold text-xs sm:text-sm text-brand-dark dark:text-gray-300 print:text-black">
+                            {rangeLogs.map((att, idx) => (
+                              <tr key={idx} className="hover:bg-brand-dark/5 dark:hover:bg-white/5 print:hover:bg-transparent">
+                                <td className="p-4 text-gray-500 dark:text-gray-400 print:text-gray-600">{att.date}</td>
+                                <td className="p-4 text-brand-dark dark:text-white print:text-black">{att.session}</td>
+                                <td className="p-4 text-right">
+                                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                    att.status?.toLowerCase() === 'present' 
+                                      ? 'bg-green-500/10 text-green-500 border border-green-500/20 print:bg-transparent print:text-green-600 print:border-green-600' 
+                                      : 'bg-brand-red/10 text-brand-red border border-brand-red/20 print:bg-transparent print:text-red-600 print:border-red-600'
+                                  }`}>
+                                    {att.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="p-12 text-center border border-dashed border-brand-dark/10 dark:border-white/10 rounded-3xl text-gray-500 dark:text-gray-400 text-sm print:border-gray-300">
+                        <Calendar size={36} className="mx-auto mb-3 opacity-40 text-brand-red" />
+                        <p className="font-bold uppercase tracking-wider mb-1">No Attendance Logged</p>
+                        <p className="text-xs">No records found for the selected date range.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* 4. BELT EXAMS TAB */}
             {activeTab === 'exams' && (() => {
