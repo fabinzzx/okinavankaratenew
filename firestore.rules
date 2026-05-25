@@ -93,5 +93,10 @@ service cloud.firestore {
       );
       allow create: if isSignedIn();
     }
+
+    // System Configuration
+    match /system_config/{configId} {
+      allow read, write: if isDojoAdmin();
+    }
   }
 }

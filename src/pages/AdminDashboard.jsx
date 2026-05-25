@@ -10,7 +10,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell 
 } from 'recharts';
 import { useAuth } from '../context/AuthContext';
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from 'firebase/firestore';
 import { getAuth, createUserWithEmailAndPassword, signOut as firebaseSignOut, sendPasswordResetEmail } from 'firebase/auth';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { db, auth, firebaseConfig } from '../firebase/config';
@@ -593,6 +593,90 @@ const AdminDashboard = () => {
       window.history.replaceState({}, document.title, newUrl);
     }
   }, [activeView]);
+
+  // Handle automatic ₹500 monthly fee increment for students at the start of a new month
+  useEffect(() => {
+    if (students.length > 0 && role === 'super_admin') {
+      const checkAndIncrementFees = async () => {
+        try {
+          const configRef = doc(db, 'system_config', 'fees');
+          const configSnap = await getDoc(configRef);
+          
+          const now = new Date();
+          const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+          
+          let lastProcessedMonth = '';
+          if (configSnap.exists()) {
+            lastProcessedMonth = configSnap.data().lastProcessedMonth || '';
+          } else {
+            // First time setup: set lastProcessedMonth to the current month to prevent retroactive charging
+            await setDoc(configRef, { 
+              lastProcessedMonth: currentMonthStr,
+              updatedAt: serverTimestamp()
+            });
+            console.log(`[Auto Fee Increment] Initial setup complete. Current month set to ${currentMonthStr}.`);
+            return;
+          }
+          
+          // If a new month has rolled over
+          if (lastProcessedMonth !== currentMonthStr) {
+            console.log(`[Auto Fee Increment] New month rollover detected (${currentMonthStr}). Processing fee updates...`);
+            
+            // 1. Lock the month immediately to prevent double processing
+            await setDoc(configRef, { 
+              lastProcessedMonth: currentMonthStr,
+              updatedAt: serverTimestamp()
+            }, { merge: true });
+            
+            // 2. Filter students
+            const studentProfiles = students.filter(s => s.role === 'student');
+            
+            // 3. Process increments in Firestore
+            let updatedCount = 0;
+            for (const student of studentProfiles) {
+              const studentId = student.id || student.uid;
+              if (studentId) {
+                const currentPending = Number(student.pendingFees || 0);
+                const nextPending = currentPending + 500;
+                const studentRef = doc(db, 'users', studentId);
+                await updateDoc(studentRef, {
+                  pendingFees: String(nextPending),
+                  feesStatus: 'pending'
+                });
+                updatedCount++;
+              }
+            }
+            
+            if (updatedCount > 0) {
+              alert(`[System Notice] A new month (${currentMonthStr}) has started. Automatically added ₹500 monthly fee increment to all ${updatedCount} student profiles.`);
+              
+              // 4. Update the local state in-memory so values update immediately without reloading
+              setStudents(prev => prev.map(s => {
+                if (s.role === 'student') {
+                  const currentPending = Number(s.pendingFees || 0);
+                  return { ...s, pendingFees: String(currentPending + 500), feesStatus: 'pending' };
+                }
+                return s;
+              }));
+              
+              // 5. Add to activity log
+              setActivityLogs(prev => [
+                { 
+                  timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
+                  action: `Auto-applied ₹500 monthly fee increment to ${updatedCount} students for new month (${currentMonthStr})`, 
+                  user: 'System' 
+                },
+                ...prev
+              ]);
+            }
+          }
+        } catch (error) {
+          console.error("Error processing auto monthly fee increment:", error);
+        }
+      };
+      checkAndIncrementFees();
+    }
+  }, [students, role]);
 
   // Load attendance records for the selected date
   useEffect(() => {
