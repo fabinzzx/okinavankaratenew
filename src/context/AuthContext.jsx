@@ -68,6 +68,7 @@ export const AuthProvider = ({ children }) => {
   // Log In with Email and Password
   const login = (email, password) => {
     clearSelectedProfiles();
+    localStorage.setItem('loginTimestamp', String(new Date().getTime()));
     return signInWithEmailAndPassword(auth, email, password);
   };
 
@@ -76,6 +77,7 @@ export const AuthProvider = ({ children }) => {
     clearSelectedProfiles();
     const userCredential = await signInWithPopup(auth, googleProvider);
     const u = userCredential.user;
+    localStorage.setItem('loginTimestamp', String(new Date().getTime()));
     
     const isAdminEmail = u.email === 'francisfabin860@gmail.com';
     let isNewUser = false;
@@ -198,6 +200,7 @@ export const AuthProvider = ({ children }) => {
   // Log Out
   const logout = () => {
     clearSelectedProfiles();
+    localStorage.removeItem('loginTimestamp');
     return signOut(auth);
   };
 
@@ -217,6 +220,27 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (currentUser) {
+        // Enforce 1-hour session limit
+        const loginTimeStr = localStorage.getItem('loginTimestamp');
+        if (loginTimeStr) {
+          const loginTime = Number(loginTimeStr);
+          const now = new Date().getTime();
+          if (now - loginTime > 3600000) { // 1 hour in ms
+            console.log("[AuthContext] Session expired (1 hour). Logging out.");
+            localStorage.removeItem('loginTimestamp');
+            signOut(auth);
+            setUser(null);
+            setRole(null);
+            setProfile(null);
+            setAvailableProfiles([]);
+            setLoading(false);
+            return;
+          }
+        } else {
+          // If no timestamp exists (e.g. legacy session), set it now
+          localStorage.setItem('loginTimestamp', String(new Date().getTime()));
+        }
+
         setUser(currentUser);
         try {
           const q = query(
@@ -330,11 +354,26 @@ export const AuthProvider = ({ children }) => {
       }
     });
 
+    // Background session expiration checker interval (checks every 10 seconds)
+    const intervalId = setInterval(() => {
+      const loginTimeStr = localStorage.getItem('loginTimestamp');
+      if (auth.currentUser && loginTimeStr) {
+        const loginTime = Number(loginTimeStr);
+        const now = new Date().getTime();
+        if (now - loginTime > 3600000) {
+          console.log("[AuthContext] Active session expired (1 hour). Auto-logging out.");
+          localStorage.removeItem('loginTimestamp');
+          signOut(auth);
+        }
+      }
+    }, 10000);
+
     return () => {
       unsubscribeAuth();
       if (unsubscribeSnapshot) {
         unsubscribeSnapshot();
       }
+      clearInterval(intervalId);
     };
   }, []);
 
