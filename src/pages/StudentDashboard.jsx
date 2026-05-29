@@ -403,10 +403,6 @@ const StudentDashboard = () => {
               <p className="text-2xl font-black text-brand-red">{totalPresentCount}</p>
               <p className="text-[10px] text-gray-500 uppercase tracking-wider mt-1 font-bold">Attendance</p>
             </div>
-            <div className="bg-brand-dark/5 dark:bg-brand-dark/50 border border-brand-dark/10 dark:border-white/5 px-6 py-3.5 rounded-2xl w-32">
-              <p className="text-2xl font-black text-brand-gold">{tournaments.length}</p>
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider mt-1 font-bold">Medals</p>
-            </div>
             <div className="bg-brand-dark/5 dark:bg-brand-dark/50 border border-brand-dark/10 dark:border-white/5 px-6 py-3.5 rounded-2xl w-32 flex flex-col justify-center items-center">
               <p className={`text-xs font-black uppercase leading-none px-2.5 py-1 rounded-full ${
                 Number(profile?.pendingFees || 0) > 0
@@ -934,7 +930,7 @@ const StudentDashboard = () => {
                 ) : (
                   <div className="p-12 text-center border border-dashed border-brand-dark/10 dark:border-white/10 rounded-3xl text-gray-500 dark:text-gray-400 text-sm">
                     <Trophy size={36} className="mx-auto mb-3 opacity-40 text-brand-gold" />
-                    <p className="font-bold uppercase tracking-wider mb-1">No Tournament Medals</p>
+                    <p className="font-bold uppercase tracking-wider mb-1">No Tournament Records</p>
                     <p className="text-xs">Championship wins and participation entries are verified and authorized by the Academy.</p>
                   </div>
                 )}
