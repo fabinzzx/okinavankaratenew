@@ -42,7 +42,6 @@ const StudentDashboard = () => {
   const [attendance, setAttendance] = useState([]);
   const [exams, setExams] = useState([]);
   const [fees, setFees] = useState([]);
-  const [tournaments, setTournaments] = useState([]);
   const [reportStartDate, setReportStartDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 30);
@@ -93,14 +92,17 @@ const StudentDashboard = () => {
         const feeSnap = await getDocs(query(collection(db, 'fees'), where('uid', '==', profileId)));
         setFees(feeSnap.docs.map(doc => doc.data()));
 
-        // Tournaments
-        const tourSnap = await getDocs(query(collection(db, 'tournaments'), where('uid', '==', profileId)));
-        setTournaments(tourSnap.docs.map(doc => doc.data()));
-
-        // Announcements
+        // Announcements (Fetch specific dojo branch + all global broadcasts)
         if (profile.dojoId) {
-          const notifSnap = await getDocs(query(collection(db, 'notifications'), where('dojoId', '==', profile.dojoId)));
-          setNotifications(notifSnap.docs.map(doc => doc.data()));
+          const notifSnap = await getDocs(query(collection(db, 'notifications'), where('dojoId', 'in', [profile.dojoId, 'all'])));
+          const docs = notifSnap.docs.map(doc => doc.data());
+          // Sort descending by creation timestamp to ensure latest announcements are first
+          const sorted = docs.sort((a, b) => {
+            const timeA = a.createdAt?.seconds || 0;
+            const timeB = b.createdAt?.seconds || 0;
+            return timeB - timeA;
+          });
+          setNotifications(sorted);
         }
 
         // Fetch Wallet Documents metadata
@@ -438,7 +440,6 @@ const StudentDashboard = () => {
               { id: 'profile', label: 'My Profile', icon: <User size={18} /> },
               { id: 'attendance', label: 'Attendance', icon: <Calendar size={18} /> },
               { id: 'exams', label: 'Belt Exams', icon: <MedalIcon size={18} /> },
-              { id: 'tournaments', label: 'Tournaments', icon: <Trophy size={18} /> },
               { id: 'fees', label: 'Dues & Fees', icon: <CreditCard size={18} /> },
               { id: 'wallet', label: 'My Wallet', icon: <FolderOpen size={18} /> }
             ].map((tab) => (
@@ -896,46 +897,7 @@ const StudentDashboard = () => {
               );
             })()}
 
-            {/* 5. TOURNAMENTS TAB */}
-            {activeTab === 'tournaments' && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-black uppercase text-brand-dark dark:text-white tracking-wide mb-2">Tournament Participations</h2>
-                  <div className="h-1 w-12 bg-brand-red mb-6" />
-                </div>
 
-                {tournaments.length > 0 ? (
-                  <div className="bg-brand-dark/5 dark:bg-brand-dark/50 border border-brand-dark/10 dark:border-white/5 rounded-2xl overflow-hidden">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-brand-dark/10 dark:bg-brand-dark border-b border-brand-dark/10 dark:border-white/10 text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider font-bold">
-                        <tr>
-                          <th className="p-4">Date</th>
-                          <th className="p-4">Championship Name</th>
-                          <th className="p-4">Category Event</th>
-                          <th className="p-4 text-right">Placement</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-brand-dark/10 dark:divide-white/5 font-semibold text-xs sm:text-sm text-brand-dark dark:text-gray-300">
-                        {tournaments.map((tour, idx) => (
-                          <tr key={idx} className="hover:bg-brand-dark/5 dark:hover:bg-white/5">
-                            <td className="p-4">{tour.date}</td>
-                            <td className="p-4 text-brand-dark dark:text-white font-extrabold">{tour.name}</td>
-                            <td className="p-4">{tour.event}</td>
-                            <td className="p-4 text-right text-brand-gold font-bold uppercase">{tour.position}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="p-12 text-center border border-dashed border-brand-dark/10 dark:border-white/10 rounded-3xl text-gray-500 dark:text-gray-400 text-sm">
-                    <Trophy size={36} className="mx-auto mb-3 opacity-40 text-brand-gold" />
-                    <p className="font-bold uppercase tracking-wider mb-1">No Tournament Records</p>
-                    <p className="text-xs">Championship wins and participation entries are verified and authorized by the Academy.</p>
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* 6. FEES TAB */}
             {activeTab === 'fees' && (
