@@ -1,8 +1,26 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Download, ShieldAlert } from 'lucide-react';
+import { FileText, Download, ShieldAlert, Lock, Eye, EyeOff } from 'lucide-react';
 
 const Downloads = () => {
+  const [password, setPassword] = useState('');
+  const [isUnlocked, setIsUnlocked] = useState(
+    sessionStorage.getItem('dojo_downloads_unlocked') === 'true'
+  );
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (password === 'okinavankarate') {
+      setIsUnlocked(true);
+      sessionStorage.setItem('dojo_downloads_unlocked', 'true');
+      setError('');
+    } else {
+      setError('Incorrect password. Please try again.');
+    }
+  };
+
   const forms = [
     {
       title: "Admission Form",
@@ -35,6 +53,64 @@ const Downloads = () => {
       description: "Karate theory study guide and oral question prep guidelines for Kyu gradings."
     }
   ];
+
+  if (!isUnlocked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center py-16 px-4 transition-colors duration-300 dark:bg-brand-dark bg-brand-light text-brand-dark dark:text-white">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="max-w-md w-full dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 p-8 rounded-3xl shadow-2xl space-y-6 text-center"
+        >
+          <div className="mx-auto w-16 h-16 bg-brand-red/10 border border-brand-red/20 rounded-2xl flex items-center justify-center text-brand-red">
+            <Lock size={32} />
+          </div>
+          
+          <div className="space-y-2">
+            <h2 className="text-2xl font-black uppercase tracking-wide">
+              Secure Downloads
+            </h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Please enter the Dojo password to access official forms and study materials.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-5 py-3.5 rounded-xl border border-brand-dark/10 dark:border-white/10 dark:bg-black/20 bg-brand-light/50 focus:outline-none focus:border-brand-red/50 transition-all font-bold text-sm tracking-widest placeholder:tracking-normal placeholder:font-medium text-center"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand-red transition-colors"
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+
+            {error && (
+              <p className="text-xs text-brand-red font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 animate-pulse">
+                <ShieldAlert size={12} />
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              className="w-full py-3.5 bg-brand-red hover:bg-red-700 text-white font-bold text-sm tracking-wider uppercase rounded-xl transition-all shadow-md hover:shadow-brand-red/25 cursor-pointer"
+            >
+              Verify Password
+            </button>
+          </form>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen py-16 transition-colors duration-300 dark:bg-brand-dark bg-brand-light text-brand-dark dark:text-white">
