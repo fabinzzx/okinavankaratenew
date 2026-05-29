@@ -1209,6 +1209,20 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleSendFeeReminder = (student) => {
+    if (!student.mobileNumber) {
+      alert("This student does not have a registered mobile number.");
+      return;
+    }
+    const cleanNumber = student.mobileNumber.replace(/\D/g, '');
+    const formattedWhatsapp = cleanNumber.length === 10 ? `91${cleanNumber}` : cleanNumber;
+    
+    const message = `Dear Parent, this is a reminder from Okinavan Karate Academy. The pending fee for ${student.fullName} is ₹${student.pendingFees}. Please clear it at your earliest convenience. Thank you!`;
+    const whatsappUrl = `https://wa.me/${formattedWhatsapp}?text=${encodeURIComponent(message)}`;
+    
+    window.open(whatsappUrl, '_blank');
+  };
+
   const handleOpenQuickFee = (student) => {
     setQuickFeeStudent(student);
     setQuickFeeAmount(student.pendingFees || '0');
@@ -1733,6 +1747,15 @@ const AdminDashboard = () => {
                         </div>
                       </div>
                       <div className="flex items-center space-x-1 shrink-0">
+                        {Number(student.pendingFees || 0) > 0 && (
+                          <button
+                            onClick={() => handleSendFeeReminder(student)}
+                            className="p-2 dark:bg-white/5 bg-brand-dark/5 hover:bg-brand-dark/10 dark:hover:bg-white/10 text-[#25D366] hover:bg-[#25D366]/10 rounded-xl transition-all"
+                            title="Send Fee Reminder (WhatsApp)"
+                          >
+                            <MessageSquare size={14} />
+                          </button>
+                        )}
                         <button
                           onClick={() => handleOpenQuickFee(student)}
                           className="p-2 dark:bg-white/5 bg-brand-dark/5 hover:bg-brand-dark/10 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-emerald-500 rounded-xl transition-all"
@@ -1806,6 +1829,15 @@ const AdminDashboard = () => {
                         </td>
                         <td className="p-4 text-right">
                           <div className="flex items-center justify-end space-x-2">
+                            {Number(student.pendingFees || 0) > 0 && (
+                              <button
+                                onClick={() => handleSendFeeReminder(student)}
+                                className="p-2 hover:bg-brand-dark/5 dark:hover:bg-white/5 text-[#25D366] hover:bg-[#25D366]/10 rounded-xl transition-all"
+                                title="Send Fee Reminder (WhatsApp)"
+                              >
+                                <MessageSquare size={14} />
+                              </button>
+                            )}
                             <button
                               onClick={() => handleOpenQuickFee(student)}
                               className="p-2 hover:bg-brand-dark/5 dark:hover:bg-white/5 text-gray-500 dark:text-gray-400 hover:text-emerald-500 rounded-xl transition-all"
