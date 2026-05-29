@@ -172,7 +172,7 @@ export const AuthProvider = ({ children }) => {
             }
           } else {
             // If the profile already has UID, check if it needs to complete onboarding details
-            if (!isAdminEmail && (existingData.isOnboarded === false || !existingData.mobileNumber)) {
+            if (!isAdminEmail && existingData.role !== 'dojo_admin' && existingData.role !== 'super_admin' && (existingData.isOnboarded === false || !existingData.mobileNumber)) {
               isNewUser = true;
             }
           }
@@ -185,10 +185,6 @@ export const AuthProvider = ({ children }) => {
         if (isAdminEmail) {
           await setDoc(doc(db, 'users', u.uid), { role: 'super_admin', dojoId: 'pattam', isOnboarded: true }, { merge: true });
           isNewUser = false;
-        } else if (existingData.role === 'dojo_admin') {
-          // Dojo admins must sign in via email+password, not Google
-          await signOut(auth);
-          throw new Error('ADMIN_NOT_ALLOWED');
         }
       }
     } catch (error) {

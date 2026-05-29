@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Users, BarChart2, Calendar, Award, CreditCard, Bell, UserCog, Home,
   Settings, Search, Plus, Edit2, Trash2, Shield, Eye, Download, FileText, MessageSquare, Mail, LogOut,
-  FolderOpen, Upload, Loader2, Image as ImageIcon, RefreshCw, Sun, Moon
+  FolderOpen, Upload, Loader2, Image as ImageIcon, RefreshCw, Sun, Moon, ShieldAlert
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell 
@@ -75,6 +75,11 @@ const AdminDashboard = () => {
   const [selectedDojoFilter, setSelectedDojoFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+
+  // Database troubleshooting states
+  const [troubleEmail, setTroubleEmail] = useState('');
+  const [troubleResults, setTroubleResults] = useState(null);
+  const [troubleLoading, setTroubleLoading] = useState(false);
 
   // Attendance states
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
@@ -939,6 +944,43 @@ const AdminDashboard = () => {
            email.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
+  const handleTroubleshootSearch = async () => {
+    if (!troubleEmail.trim()) {
+      alert("Please enter an email address.");
+      return;
+    }
+    setTroubleLoading(true);
+    try {
+      const q = query(
+        collection(db, 'users'),
+        where('email', '==', troubleEmail.trim().toLowerCase())
+      );
+      const snap = await getDocs(q);
+      const results = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setTroubleResults(results);
+    } catch (error) {
+      console.error("Troubleshoot search error:", error);
+      alert("Error searching database: " + error.message);
+    } finally {
+      setTroubleLoading(false);
+    }
+  };
+
+  const handleTroubleDelete = async (docId, fullName) => {
+    if (!window.confirm(`CRITICAL WARNING: Are you sure you want to permanently delete the document for "${fullName}" (ID: ${docId}) from Firestore? This action is irreversible and might cause database mismatch.`)) return;
+    try {
+      await deleteDoc(doc(db, 'users', docId));
+      alert("Document deleted successfully!");
+      // Update search results list
+      setTroubleResults(prev => prev.filter(item => item.id !== docId));
+      // Update main student roster if the deleted document was in it
+      setStudents(prev => prev.filter(s => (s.id || s.uid) !== docId));
+    } catch (error) {
+      console.error("Troubleshoot delete error:", error);
+      alert("Failed to delete document: " + error.message);
+    }
+  };
+
   const handleCreateAdmin = async (e) => {
     e.preventDefault();
     if (adminForm.dojoIds.length === 0) {
@@ -957,16 +999,14 @@ const AdminDashboard = () => {
         return;
       }
 
-      const secondaryApp = initializeApp(firebaseConfig, `admin-create-${Date.now()}`);
-      const secondaryAuth = getAuth(secondaryApp);
-      const credential = await createUserWithEmailAndPassword(secondaryAuth, normalizedEmail, 'test12');
-      const newUid = credential.user.uid;
-      await firebaseSignOut(secondaryAuth);
-      await deleteApp(secondaryApp);
+      // Generate a new document reference in 'users' collection
+      const newAdminRef = doc(collection(db, 'users'));
+      const newUid = newAdminRef.id;
 
       // Primary dojoId is first selected, dojoIds holds all
       const primaryDojoId = adminForm.dojoIds[0];
       const adminData = {
+        id: newUid,
         uid: newUid,
         fullName: adminForm.fullName,
         email: normalizedEmail,
@@ -976,8 +1016,7 @@ const AdminDashboard = () => {
         isOnboarded: true,
         createdAt: serverTimestamp(),
       };
-      await setDoc(doc(db, 'users', newUid), adminData);
-      await sendPasswordResetEmail(auth, normalizedEmail);
+      await setDoc(newAdminRef, adminData);
 
       setStudents(prev => [...prev, { ...adminData, id: newUid }]);
       setActivityLogs(prev => [
@@ -987,14 +1026,10 @@ const AdminDashboard = () => {
       setIsAdminModalOpen(false);
       setAdminForm({ fullName: '', email: '', dojoIds: [] });
       const dojoNames = adminForm.dojoIds.map(id => DOJO_LIST.find(d => d.id === id)?.name || id).join(', ');
-      alert(`Admin account created!\n\nName: ${adminForm.fullName}\nEmail: ${normalizedEmail}\nDojos: ${dojoNames}\nDefault Password: test12\n\nA password reset email has been sent.`);
+      alert(`Admin account created successfully!\n\nName: ${adminForm.fullName}\nEmail: ${normalizedEmail}\nDojos: ${dojoNames}\n\nThey can now sign in immediately using their Google Account.`);
     } catch (error) {
       console.error(error);
-      if (error.code === 'auth/email-already-in-use') {
-        alert('An account with this email already exists.');
-      } else {
-        alert('Failed to create admin profile: ' + error.message);
-      }
+      alert('Failed to create admin profile: ' + error.message);
     } finally {
       setAdminCreating(false);
     }
@@ -1929,6 +1964,90 @@ const AdminDashboard = () => {
                   </tbody>
                 </table>
               </div>
+            </div>
+
+            {/* Database Troubleshooting Tool */}
+            <div className="dark:bg-white/5 bg-white border border-brand-dark/10 dark:border-white/10 rounded-3xl p-6 shadow-2xl mt-8">
+              <div className="flex items-center space-x-2 mb-4 border-b border-brand-dark/10 dark:border-white/10 pb-3">
+                <ShieldAlert className="text-brand-red shrink-0" size={20} />
+                <h3 className="text-lg font-black uppercase text-brand-dark dark:text-white tracking-wide">
+                  Database Troubleshooting & Cleanup Tool
+                </h3>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">
+                Use this tool to find and delete orphaned, duplicate, or hidden user documents in Firestore. 
+                Search by exact email address to locate documents that might not be visible in the roster above.
+              </p>
+              
+              <div className="flex flex-col sm:flex-row gap-3 items-end mb-6">
+                <div className="w-full">
+                  <label className="text-[10px] font-extrabold text-gray-500 dark:text-gray-400 uppercase tracking-widest block mb-1.5">
+                    Search Email Address
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="Enter email to check (e.g. josemonnj68@gmail.com)"
+                    value={troubleEmail}
+                    onChange={(e) => setTroubleEmail(e.target.value)}
+                    className="w-full bg-brand-dark/5 dark:bg-brand-dark/50 border border-brand-dark/10 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-brand-red/50 text-brand-dark dark:text-white placeholder-gray-400"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleTroubleshootSearch}
+                  disabled={troubleLoading}
+                  className="px-6 py-2.5 bg-brand-dark text-white border border-white/10 hover:bg-gray-900 font-bold text-xs tracking-wider uppercase rounded-xl transition-all shadow-md shrink-0 h-[38px] flex items-center justify-center space-x-1.5 cursor-pointer"
+                >
+                  {troubleLoading ? (
+                    <div className="animate-spin rounded-full h-3.5 w-3.5 border-t-2 border-b-2 border-white"></div>
+                  ) : (
+                    <span>Search Database</span>
+                  )}
+                </button>
+              </div>
+
+              {troubleResults !== null && (
+                <div className="space-y-4">
+                  <h4 className="text-xs font-black uppercase text-gray-500 dark:text-gray-400 tracking-wider">
+                    Search Results ({troubleResults.length})
+                  </h4>
+                  
+                  {troubleResults.length === 0 ? (
+                    <div className="p-4 bg-brand-dark/5 dark:bg-white/5 rounded-xl border border-brand-dark/10 dark:border-white/10 text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                      No documents found in Firestore for <span className="font-extrabold text-brand-dark dark:text-white">{troubleEmail}</span>.
+                      <div className="mt-2 text-[11px] text-brand-gold font-bold">
+                        Note: If you still cannot register this email, it may exist in Firebase Authentication. 
+                        Please delete it from the Firebase Console (Authentication &gt; Users tab).
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {troubleResults.map((docItem) => (
+                        <div key={docItem.id} className="p-4 bg-brand-red/5 dark:bg-brand-red/10 border border-brand-red/20 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="space-y-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-xs font-extrabold text-brand-dark dark:text-white">{docItem.fullName || 'No Name'}</span>
+                              <span className="px-1.5 py-0.5 bg-brand-dark/10 dark:bg-white/10 text-brand-dark dark:text-gray-400 rounded text-[9px] uppercase font-bold">
+                                {docItem.role || 'no role'}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400">Email: {docItem.email}</p>
+                            <p className="text-[10px] font-mono text-gray-400">Doc ID: {docItem.id}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleTroubleDelete(docItem.id, docItem.fullName)}
+                            className="px-4 py-2 bg-brand-red text-white hover:bg-red-700 font-bold text-[10px] tracking-wider uppercase rounded-lg transition-all shadow-sm flex items-center justify-center space-x-1 cursor-pointer shrink-0"
+                          >
+                            <Trash2 size={12} />
+                            <span>Delete Document</span>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
