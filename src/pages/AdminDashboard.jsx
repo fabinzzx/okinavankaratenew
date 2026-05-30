@@ -74,6 +74,7 @@ const AdminDashboard = () => {
   const [students, setStudents] = useState([]);
   const [selectedDojoFilter, setSelectedDojoFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [attendanceSearchQuery, setAttendanceSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
   // Database troubleshooting states
@@ -433,7 +434,7 @@ const AdminDashboard = () => {
         
         // Find duplicates by email + normalized name and clean them up
         const duplicateMap = {};
-        const duplicatesToDelete = [];
+        const migrations = [];
         
         list.forEach(item => {
           if (!item.email || !item.fullName) return;
@@ -519,22 +520,65 @@ const AdminDashboard = () => {
 
             cleanedList.push(officialDoc);
             
-            // Collect the temporary random documents for deletion
+            // Collect the temporary random documents for deletion and migration
             tempDocs.forEach(td => {
-              duplicatesToDelete.push(td.id);
+              migrations.push({ tempId: td.id, officialId: officialDoc.id });
             });
           } else {
             cleanedList.push(docs[0]);
           }
         }
 
-        // Fire off background deletions for duplicates (admins have full write/delete permissions)
-        duplicatesToDelete.forEach(async (tempId) => {
+        // Fire off background deletions and migrations for duplicates
+        migrations.forEach(async ({ tempId, officialId }) => {
           try {
+            // 1. Delete duplicate student user document
             await deleteDoc(doc(db, 'users', tempId));
             console.log(`[Autoclean] Deleted duplicate student document: ${tempId}`);
+
+            // 2. Migrate Attendance Logs
+            const attQuery = query(collection(db, 'attendance'), where('uid', '==', tempId));
+            const attSnap = await getDocs(attQuery);
+            for (const attDoc of attSnap.docs) {
+              const attData = attDoc.data();
+              const oldDocId = attDoc.id;
+              const newDocId = `${officialId}_${attData.date}`;
+              
+              // Write new doc under officialId prefix
+              await setDoc(doc(db, 'attendance', newDocId), {
+                ...attData,
+                uid: officialId
+              });
+              // Delete old doc under tempId prefix
+              await deleteDoc(doc(db, 'attendance', oldDocId));
+              console.log(`[Autoclean] Migrated attendance log ${oldDocId} -> ${newDocId}`);
+            }
+
+            // 3. Migrate Fees Records
+            const feesQuery = query(collection(db, 'fees'), where('uid', '==', tempId));
+            const feesSnap = await getDocs(feesQuery);
+            for (const feeDoc of feesSnap.docs) {
+              await updateDoc(doc(db, 'fees', feeDoc.id), { uid: officialId });
+              console.log(`[Autoclean] Migrated fee record ${feeDoc.id} to officialId ${officialId}`);
+            }
+
+            // 4. Migrate Exams Records
+            const examsQuery = query(collection(db, 'exams'), where('uid', '==', tempId));
+            const examsSnap = await getDocs(examsQuery);
+            for (const examDoc of examsSnap.docs) {
+              await updateDoc(doc(db, 'exams', examDoc.id), { uid: officialId });
+              console.log(`[Autoclean] Migrated exam record ${examDoc.id} to officialId ${officialId}`);
+            }
+
+            // 5. Migrate Documents
+            const docQuery = query(collection(db, 'documents'), where('parentUid', '==', tempId));
+            const docSnap = await getDocs(docQuery);
+            for (const documentDoc of docSnap.docs) {
+              await updateDoc(doc(db, 'documents', documentDoc.id), { parentUid: officialId });
+              console.log(`[Autoclean] Migrated document record ${documentDoc.id} to parentUid ${officialId}`);
+            }
           } catch (err) {
-            console.warn(`[Autoclean] Failed to delete duplicate student document ${tempId}:`, err);
+            console.warn(`[Autoclean] Error during deletion/migration of duplicate student document ${tempId}:`, err);
           }
         });
 
@@ -923,8 +967,8 @@ const AdminDashboard = () => {
   const filteredAttendanceStudents = attendanceStudentsList.filter(student => {
     const fullName = student.fullName || '';
     const email = student.email || '';
-    return fullName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-           email.toLowerCase().includes(searchQuery.toLowerCase());
+    return fullName.toLowerCase().includes(attendanceSearchQuery.toLowerCase()) || 
+           email.toLowerCase().includes(attendanceSearchQuery.toLowerCase());
   });
 
   const handleTroubleshootSearch = async () => {
@@ -2177,6 +2221,17 @@ const AdminDashboard = () => {
                           );
                         })()}
                       </div>
+
+                      <div className="space-y-1.5 w-full sm:w-auto">
+                        <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Search Student</label>
+                        <input
+                          type="text"
+                          placeholder="Search name or email..."
+                          value={attendanceSearchQuery}
+                          onChange={(e) => setAttendanceSearchQuery(e.target.value)}
+                          className="dark:bg-brand-dark bg-white border border-brand-dark/15 dark:border-white/15 rounded-xl px-4 py-2.5 text-sm dark:text-white text-brand-dark focus:outline-none focus:border-brand-red/50 w-full sm:w-64"
+                        />
+                      </div>
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto xl:self-end">
@@ -2303,6 +2358,17 @@ const AdminDashboard = () => {
                           );
                         })()}
                       </div>
+
+                      <div className="space-y-1.5 w-full sm:w-auto">
+                        <label className="text-xs font-extrabold dark:text-gray-300 text-gray-700 uppercase tracking-widest block">Search Student</label>
+                        <input
+                          type="text"
+                          placeholder="Search name or email..."
+                          value={attendanceSearchQuery}
+                          onChange={(e) => setAttendanceSearchQuery(e.target.value)}
+                          className="dark:bg-brand-dark bg-white border border-brand-dark/15 dark:border-white/15 rounded-xl px-4 py-2 text-xs dark:text-white text-brand-dark focus:outline-none focus:border-brand-red/50 w-full sm:w-44"
+                        />
+                      </div>
                     </div>
 
                     <button
@@ -2336,38 +2402,42 @@ const AdminDashboard = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y dark:divide-white/5 divide-brand-dark/10 print:divide-gray-200 font-semibold text-xs sm:text-sm dark:text-gray-300 text-brand-dark print:text-black">
-                        {filteredAttendanceStudents.map((student) => {
-                          const studentId = student.id || student.uid;
-                          const studentLogs = dojoLogs.filter(log => log.uid === studentId && log.date >= reportStartDate && log.date <= reportEndDate);
-                          const total = studentLogs.length;
-                          const present = studentLogs.filter(log => log.status === 'Present').length;
-                          const percent = total > 0 ? ((present / total) * 100).toFixed(1) : '100.0';
-                          return (
-                            <tr key={studentId} className="hover:bg-brand-dark/5 dark:hover:bg-white/5 print:hover:bg-transparent">
-                              <td className="p-4">
-                                <p className="dark:text-white text-brand-dark print:text-black font-extrabold">{student.fullName}</p>
-                                <p className="text-[10px] text-gray-500 print:text-gray-600 font-semibold hidden md:block print:block">{student.email}</p>
-                                <button
-                                  onClick={() => handleOpenStudentLogs(student)}
-                                  className="text-brand-red hover:text-red-700 text-[10px] font-black uppercase tracking-wider md:hidden mt-1 block no-print cursor-pointer"
-                                >
-                                  View Logs
-                                </button>
-                              </td>
-                              <td className="p-4 text-center font-mono dark:text-gray-400 text-gray-600 print:text-gray-700">{total}</td>
-                              <td className="p-4 text-center font-mono text-emerald-600 dark:text-emerald-400 print:text-emerald-700">{present}</td>
-                              <td className="p-4 text-right font-black text-brand-gold print:text-amber-800">{percent}%</td>
-                              <td className="p-4 text-right no-print hidden md:table-cell">
-                                <button
-                                  onClick={() => handleOpenStudentLogs(student)}
-                                  className="px-3 py-1.5 bg-brand-red hover:bg-red-700 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer"
-                                >
-                                  View Logs
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
+                        {(() => {
+                          const uniqueDates = Array.from(new Set(dojoLogs.map(log => log.date)))
+                            .filter(date => date >= reportStartDate && date <= reportEndDate);
+                          
+                          return filteredAttendanceStudents.map((student) => {
+                            const studentId = student.id || student.uid;
+                            const total = uniqueDates.length;
+                            const present = dojoLogs.filter(log => log.uid === studentId && log.date >= reportStartDate && log.date <= reportEndDate && log.status === 'Present').length;
+                            const percent = total > 0 ? ((present / total) * 100).toFixed(1) : '100.0';
+                            return (
+                              <tr key={studentId} className="hover:bg-brand-dark/5 dark:hover:bg-white/5 print:hover:bg-transparent">
+                                <td className="p-4">
+                                  <p className="dark:text-white text-brand-dark print:text-black font-extrabold">{student.fullName}</p>
+                                  <p className="text-[10px] text-gray-500 print:text-gray-600 font-semibold hidden md:block print:block">{student.email}</p>
+                                  <button
+                                    onClick={() => handleOpenStudentLogs(student)}
+                                    className="text-brand-red hover:text-red-700 text-[10px] font-black uppercase tracking-wider md:hidden mt-1 block no-print cursor-pointer"
+                                  >
+                                    View Logs
+                                  </button>
+                                </td>
+                                <td className="p-4 text-center font-mono dark:text-gray-400 text-gray-600 print:text-gray-700">{total}</td>
+                                <td className="p-4 text-center font-mono text-emerald-600 dark:text-emerald-400 print:text-emerald-700">{present}</td>
+                                <td className="p-4 text-right font-black text-brand-gold print:text-amber-800">{percent}%</td>
+                                <td className="p-4 text-right no-print hidden md:table-cell">
+                                  <button
+                                    onClick={() => handleOpenStudentLogs(student)}
+                                    className="px-3 py-1.5 bg-brand-red hover:bg-red-700 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer"
+                                  >
+                                    View Logs
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          });
+                        })()}
                       </tbody>
                     </table>
                   </div>
