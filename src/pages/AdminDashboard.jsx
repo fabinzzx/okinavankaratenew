@@ -120,7 +120,8 @@ const AdminDashboard = () => {
     dojoId: 'pattam',
     beltGrade: 'White Belt',
     role: 'student',
-    pendingFees: '0'
+    pendingFees: '0',
+    isNewStudent: true
   });
 
   // Admin creation modal (super_admin only)
@@ -900,9 +901,14 @@ const AdminDashboard = () => {
     const studentId = student.id || student.uid;
     
     // Find all training dates in the selected range
-    const uniqueDates = Array.from(new Set(dojoLogs.map(log => log.date)))
-      .filter(date => date >= reportStartDate && date <= reportEndDate)
-      .sort((a, b) => new Date(b) - new Date(a));
+    let uniqueDates = Array.from(new Set(dojoLogs.map(log => log.date)))
+      .filter(date => date >= reportStartDate && date <= reportEndDate);
+      
+    if (student.joinedDate) {
+      uniqueDates = uniqueDates.filter(date => date >= student.joinedDate);
+    }
+    
+    uniqueDates.sort((a, b) => new Date(b) - new Date(a));
 
     const studentLogsForDates = uniqueDates.map(date => {
       const log = dojoLogs.find(l => l.uid === studentId && l.date === date);
@@ -1107,6 +1113,9 @@ const AdminDashboard = () => {
         feesStatus: Number(studentForm.pendingFees || 0) > 0 ? 'pending' : 'paid',
         createdAt: serverTimestamp(),
       };
+      if (studentForm.isNewStudent) {
+        studentData.joinedDate = new Date().toISOString().split('T')[0];
+      }
       await setDoc(newStudentRef, studentData);
       setStudents([...students, studentData]);
       setIsStudentModalOpen(false);
@@ -1114,7 +1123,7 @@ const AdminDashboard = () => {
         { timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `${targetRole === 'dojo_admin' ? 'Dojo Admin' : 'Student'} profile created for ${studentForm.fullName}`, user: role === 'super_admin' ? 'Super Admin' : 'Dojo Admin' },
         ...prev
       ]);
-      setStudentForm({ fullName: '', email: '', mobileNumber: '', dojoId: 'pattam', beltGrade: 'White Belt', role: 'student', pendingFees: '0' });
+      setStudentForm({ fullName: '', email: '', mobileNumber: '', dojoId: 'pattam', beltGrade: 'White Belt', role: 'student', pendingFees: '0', isNewStudent: true });
       alert(`${targetRole === 'dojo_admin' ? 'Admin' : 'Student'} profile created successfully!`);
     } catch (error) {
       console.error(error);
@@ -1706,7 +1715,8 @@ const AdminDashboard = () => {
                       dojoId: role === 'super_admin' ? 'pattam' : (profile?.dojoIds?.[0] || profile?.dojoId || 'pattam'),
                       beltGrade: 'White Belt',
                       role: 'student',
-                      pendingFees: '0'
+                      pendingFees: '0',
+                      isNewStudent: true
                     });
                     setIsStudentModalOpen(true);
                   }}
@@ -2403,12 +2413,15 @@ const AdminDashboard = () => {
                       </thead>
                       <tbody className="divide-y dark:divide-white/5 divide-brand-dark/10 print:divide-gray-200 font-semibold text-xs sm:text-sm dark:text-gray-300 text-brand-dark print:text-black">
                         {(() => {
-                          const uniqueDates = Array.from(new Set(dojoLogs.map(log => log.date)))
+                          const allUniqueDates = Array.from(new Set(dojoLogs.map(log => log.date)))
                             .filter(date => date >= reportStartDate && date <= reportEndDate);
                           
                           return filteredAttendanceStudents.map((student) => {
                             const studentId = student.id || student.uid;
-                            const total = uniqueDates.length;
+                            const studentUniqueDates = student.joinedDate 
+                              ? allUniqueDates.filter(d => d >= student.joinedDate)
+                              : allUniqueDates;
+                            const total = studentUniqueDates.length;
                             const present = dojoLogs.filter(log => log.uid === studentId && log.date >= reportStartDate && log.date <= reportEndDate && log.status === 'Present').length;
                             const percent = total > 0 ? ((present / total) * 100).toFixed(1) : '100.0';
                             return (
@@ -2980,6 +2993,19 @@ const AdminDashboard = () => {
                       placeholder="e.g. 1500"
                     />
                   </div>
+                </div>
+
+                <div className="flex items-center space-x-2 pt-2">
+                  <input
+                    type="checkbox"
+                    id="isNewStudent"
+                    checked={studentForm.isNewStudent}
+                    onChange={(e) => setStudentForm({ ...studentForm, isNewStudent: e.target.checked })}
+                    className="h-4 w-4 rounded dark:bg-brand-dark/50 border-brand-dark/15 dark:border-white/10 text-brand-red focus:ring-brand-red/50 cursor-pointer"
+                  />
+                  <label htmlFor="isNewStudent" className="uppercase tracking-widest dark:text-gray-300 text-gray-700 cursor-pointer select-none text-xs">
+                    New Student (Attendance starts from today)
+                  </label>
                 </div>
 
                 <div className="flex items-center space-x-3 pt-4">
