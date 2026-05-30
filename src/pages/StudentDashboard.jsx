@@ -311,10 +311,10 @@ const StudentDashboard = () => {
           <div>
             <img src="/images/LOGO.png" alt="Academy Logo" className="h-16 w-16 mx-auto mb-4 object-contain" />
             <h1 className="text-2xl sm:text-3xl font-black uppercase text-brand-dark dark:text-white tracking-wide">
-              Select <span className="text-brand-red">Student Profile</span>
+              Select <span className="text-brand-red">Your Profile</span>
             </h1>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 uppercase tracking-widest font-bold">
-              Multiple sibling profiles found for {user?.email}
+              Multiple profiles found for {user?.email}
             </p>
           </div>
 
@@ -341,10 +341,14 @@ const StudentDashboard = () => {
                     {student.fullName}
                   </h3>
                   <p className="text-[10px] text-brand-gold uppercase tracking-wider font-extrabold truncate mt-0.5">
-                    {student.beltGrade || 'White Belt'}
+                    {student.role === 'super_admin' ? 'Super Admin' : student.role === 'dojo_admin' ? 'Dojo Admin' : (student.beltGrade || 'White Belt')}
                   </p>
                   <p className="text-[9px] text-gray-500 font-bold truncate mt-0.5">
-                    Dojo: {student.dojoId || 'Pattam'}
+                    {student.role === 'super_admin'
+                      ? 'Dojo: All Dojos'
+                      : student.role === 'dojo_admin' && student.dojoIds?.length > 0
+                        ? `Dojos: ${student.dojoIds.join(', ')}`
+                        : `Dojo: ${student.dojoId || 'Pattam'}`}
                   </p>
                 </div>
               </button>
@@ -796,37 +800,89 @@ const StudentDashboard = () => {
 
             {/* 4. BELT EXAMS TAB */}
             {activeTab === 'exams' && (() => {
-              const combinedExams = [];
-              
-              // Add from Firestore exams
-              exams.forEach(ex => {
-                combinedExams.push({
-                  date: ex.date || 'Recent',
-                  beltGrade: ex.beltGrade,
-                  examiner: ex.examiner || 'Dojo Instructor',
-                  score: ex.score || 'PASSED',
-                  result: ex.result || 'PASSED'
-                });
-              });
+              const ORDERED_BELTS = [
+                "White Belt",
+                "Yellow Belt",
+                "Orange Belt",
+                "Green Belt",
+                "Blue Belt",
+                "Purple Belt",
+                "Brown Junior",
+                "Brown Senior",
+                "Brown Super Senior",
+                "Black Belt"
+              ];
 
-              // Add from profile.beltHistory if not already present by beltGrade
+              const getNormalizedBelt = (beltName) => {
+                if (!beltName) return "White Belt";
+                const lower = beltName.toLowerCase();
+                if (lower.includes("white")) return "White Belt";
+                if (lower.includes("yellow")) return "Yellow Belt";
+                if (lower.includes("orange")) return "Orange Belt";
+                if (lower.includes("green")) return "Green Belt";
+                if (lower.includes("blue")) return "Blue Belt";
+                if (lower.includes("purple")) return "Purple Belt";
+                if (lower.includes("brown junior")) return "Brown Junior";
+                if (lower.includes("brown senior")) return "Brown Senior";
+                if (lower.includes("brown super")) return "Brown Super Senior";
+                if (lower.includes("brown")) return "Brown Junior";
+                if (lower.includes("black")) return "Black Belt";
+                return "White Belt";
+              };
+
+              const currentBeltNorm = getNormalizedBelt(profile?.beltGrade);
+              const currentIndex = ORDERED_BELTS.indexOf(currentBeltNorm);
+              const resolvedIndex = currentIndex === -1 ? 0 : currentIndex;
+
+              const actualRecords = {};
               if (profile?.beltHistory) {
                 profile.beltHistory.forEach(bh => {
-                  const exists = combinedExams.some(ex => ex.beltGrade?.toLowerCase() === bh.belt?.toLowerCase());
-                  if (!exists) {
-                    combinedExams.push({
-                      date: bh.date || 'Recent',
-                      beltGrade: bh.belt,
-                      examiner: bh.updatedBy || 'Dojo Instructor',
-                      score: 'Promoted',
-                      result: 'PASSED'
-                    });
+                  if (bh.belt) {
+                    actualRecords[getNormalizedBelt(bh.belt)] = bh;
                   }
                 });
               }
+              exams.forEach(ex => {
+                if (ex.beltGrade) {
+                  const norm = getNormalizedBelt(ex.beltGrade);
+                  if (!actualRecords[norm]) {
+                    actualRecords[norm] = {
+                      belt: ex.beltGrade,
+                      date: ex.date,
+                      score: ex.score,
+                      result: ex.result
+                    };
+                  }
+                }
+              });
 
-              // Sort descending by date
+              const baseDate = profile?.createdAt?.seconds 
+                ? new Date(profile.createdAt.seconds * 1000) 
+                : new Date();
+
+              const combinedExams = [];
+              for (let i = 0; i <= resolvedIndex; i++) {
+                const beltNorm = ORDERED_BELTS[i];
+                const record = actualRecords[beltNorm];
+                
+                // Do not estimate dates. If there's no actual record, set it to empty.
+                let dateStr = record?.date || "";
+
+                combinedExams.push({
+                  date: dateStr,
+                  beltGrade: record?.belt || beltNorm,
+                  examiner: 'Kyoshi Thomas Kathanatt',
+                  score: record?.score || 'PASSED',
+                  result: record?.result || 'PASSED'
+                });
+              }
+
+              // Sort by date: actual dates sorted descending at the top, empty/blank dates at the bottom
               combinedExams.sort((a, b) => {
+                if (!a.date && !b.date) return 0;
+                if (!a.date) return 1; // move empty date to bottom
+                if (!b.date) return -1; // move empty date to bottom
+                
                 const dateA = new Date(a.date).getTime() || 0;
                 const dateB = new Date(b.date).getTime() || 0;
                 return dateB - dateA;
@@ -840,16 +896,23 @@ const StudentDashboard = () => {
                   </div>
 
                   {/* Timeline for Belt Promotions */}
-                  {profile?.beltHistory && profile.beltHistory.length > 0 && (
+                  {combinedExams.length > 0 && (
                     <div className="bg-brand-dark/5 dark:bg-brand-dark/50 border border-brand-dark/10 dark:border-white/5 p-6 rounded-3xl space-y-4">
                       <h3 className="text-sm font-extrabold uppercase text-gray-500 dark:text-gray-300 tracking-wider">Promotion History Timeline</h3>
                       <div className="relative pl-6 border-l border-brand-gold/30 space-y-6">
-                        {profile.beltHistory.slice().reverse().map((bh, idx) => (
+                        {combinedExams.map((exam, idx) => (
                           <div key={idx} className="relative">
                             <span className="absolute -left-[30px] top-1.5 h-3.5 w-3.5 rounded-full border-2 border-brand-gold bg-white dark:bg-brand-dark" />
                             <div>
-                              <p className="text-sm font-black text-brand-dark dark:text-white uppercase tracking-wide">{bh.belt}</p>
-                              <p className="text-[10px] text-gray-500 mt-0.5">Awarded on: <strong>{bh.date}</strong> by {bh.updatedBy || 'Dojo Instructor'}</p>
+                              <p className="text-sm font-black text-brand-dark dark:text-white uppercase tracking-wide">{exam.beltGrade}</p>
+                              <p className="text-[10px] text-gray-500 mt-0.5">
+                                {exam.date ? (
+                                  <>Awarded on: <strong>{exam.date}</strong> by </>
+                                ) : (
+                                  <>Awarded by: </>
+                                )}
+                                <strong>{exam.examiner}</strong>
+                              </p>
                             </div>
                           </div>
                         ))}
@@ -876,7 +939,7 @@ const StudentDashboard = () => {
                         <tbody className="divide-y divide-brand-dark/10 dark:divide-white/5 font-semibold text-xs sm:text-sm text-brand-dark dark:text-gray-300">
                           {combinedExams.map((exam, idx) => (
                             <tr key={idx} className="hover:bg-brand-dark/5 dark:hover:bg-white/5">
-                              <td className="p-4">{exam.date}</td>
+                              <td className="p-4">{exam.date || "—"}</td>
                               <td className="p-4 text-brand-dark dark:text-white font-extrabold">{exam.beltGrade}</td>
                               <td className="p-4">{exam.examiner}</td>
                               <td className="p-4 text-brand-gold">{exam.score}</td>

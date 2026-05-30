@@ -25,6 +25,7 @@ export const AuthProvider = ({ children }) => {
     const selected = availableProfiles.find(p => p.id === profileId);
     if (selected) {
       setProfile(selected);
+      setRole(selected.role);
       if (user) {
         localStorage.setItem(`selectedStudentId_${user.uid}`, profileId);
       }
@@ -33,6 +34,7 @@ export const AuthProvider = ({ children }) => {
 
   const switchProfile = () => {
     setProfile(null);
+    setRole('student');
     if (user) {
       localStorage.removeItem(`selectedStudentId_${user.uid}`);
     }
@@ -220,13 +222,13 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (currentUser) {
-        // Enforce 1-hour session limit
+        // Enforce 12-hour session limit
         const loginTimeStr = localStorage.getItem('loginTimestamp');
         if (loginTimeStr) {
           const loginTime = Number(loginTimeStr);
           const now = new Date().getTime();
-          if (now - loginTime > 3600000) { // 1 hour in ms
-            console.log("[AuthContext] Session expired (1 hour). Logging out.");
+          if (now - loginTime > 43200000) { // 12 hours in ms
+            console.log("[AuthContext] Session expired (12 hours). Logging out.");
             localStorage.removeItem('loginTimestamp');
             signOut(auth);
             setUser(null);
@@ -254,26 +256,11 @@ export const AuthProvider = ({ children }) => {
             if (!querySnapshot.empty) {
               const docs = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
 
-              // First, check if there's an admin profile
-              const adminDoc = docs.find(d => d.role === 'super_admin' || d.role === 'dojo_admin');
-              if (adminDoc) {
-                // For super admin, verify fields
-                if (isAdminEmail && (adminDoc.role !== 'super_admin' || adminDoc.dojoId !== 'pattam' || !adminDoc.isOnboarded)) {
-                  const docRef = doc(db, 'users', adminDoc.id);
-                  await setDoc(docRef, { role: 'super_admin', dojoId: 'pattam', isOnboarded: true }, { merge: true });
-                  return;
-                }
-                setRole(adminDoc.role);
-                setProfile(adminDoc);
-                setAvailableProfiles([]);
-                setLoading(false);
-                return;
-              }
+              // Separate admin profiles
+              const adminProfiles = docs.filter(d => d.role === 'super_admin' || d.role === 'dojo_admin');
 
-              // Filter for student profiles
+              // Filter and deduplicate student profiles
               let studentProfiles = docs.filter(d => d.role === 'student');
-
-              // Deduplicate in-memory if an official Google UID document exists
               const officialStudentProfile = studentProfiles.find(p => p.id === currentUser.uid);
               if (officialStudentProfile) {
                 studentProfiles = studentProfiles.filter(p => {
@@ -285,22 +272,35 @@ export const AuthProvider = ({ children }) => {
                 });
               }
 
-              if (studentProfiles.length > 0) {
-                setRole('student');
-                if (studentProfiles.length > 1) {
-                  setAvailableProfiles(studentProfiles);
-                  // Load preference from localStorage
-                  const savedId = localStorage.getItem(`selectedStudentId_${currentUser.uid}`);
-                  const selected = studentProfiles.find(p => p.id === savedId);
-                  if (selected) {
-                    setProfile(selected);
-                  } else {
-                    setProfile(null); // Parent must select profile
-                  }
+              // Combine all available profiles
+              const combinedProfiles = [...adminProfiles, ...studentProfiles];
+
+              if (combinedProfiles.length > 1) {
+                setAvailableProfiles(combinedProfiles);
+                // Load preference from localStorage
+                const savedId = localStorage.getItem(`selectedStudentId_${currentUser.uid}`);
+                const selected = combinedProfiles.find(p => p.id === savedId);
+                if (selected) {
+                  setProfile(selected);
+                  setRole(selected.role);
                 } else {
-                  setAvailableProfiles([]);
-                  setProfile(studentProfiles[0]);
+                  setProfile(null); // User must select profile
+                  setRole('student'); // Default role to student so they go to student selection screen on /dashboard
                 }
+                setLoading(false);
+              } else if (combinedProfiles.length === 1) {
+                const singleProfile = combinedProfiles[0];
+                if (singleProfile.role === 'super_admin' || singleProfile.role === 'dojo_admin') {
+                  // For super admin, verify fields
+                  if (isAdminEmail && (singleProfile.role !== 'super_admin' || singleProfile.dojoId !== 'pattam' || !singleProfile.isOnboarded)) {
+                    const docRef = doc(db, 'users', singleProfile.id);
+                    await setDoc(docRef, { role: 'super_admin', dojoId: 'pattam', isOnboarded: true }, { merge: true });
+                    return;
+                  }
+                }
+                setRole(singleProfile.role);
+                setProfile(singleProfile);
+                setAvailableProfiles([]);
                 setLoading(false);
               } else {
                 setRole('student');
@@ -360,8 +360,8 @@ export const AuthProvider = ({ children }) => {
       if (auth.currentUser && loginTimeStr) {
         const loginTime = Number(loginTimeStr);
         const now = new Date().getTime();
-        if (now - loginTime > 3600000) {
-          console.log("[AuthContext] Active session expired (1 hour). Auto-logging out.");
+        if (now - loginTime > 43200000) {
+          console.log("[AuthContext] Active session expired (12 hours). Auto-logging out.");
           localStorage.removeItem('loginTimestamp');
           signOut(auth);
         }
